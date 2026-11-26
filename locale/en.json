@@ -1,0 +1,7 @@
+{
+  "meta": {
+    "title": "Span compaction",
+    "description": "Caps the history replayed into one summarization pass, and adds model-driven compaction tools and a context-pressure reminder. Its configuration page sits on the bundle card in Plugins.",
+    "detail": "INTRODUCTION.md"
+  }
+}

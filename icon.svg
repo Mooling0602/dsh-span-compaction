@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 36 36" role="img" aria-label="Conversation history condensed into one shorter block">
+  <rect x="2.5" y="2.5" width="31" height="31" rx="7.5" fill="#2b5d8a"/>
+  <g fill="none" stroke="#ffffff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M11 11h14M11 15h10M11 19h13"/>
+  </g>
+  <path d="M12.5 23h11" stroke="#9fd3ef" stroke-width="3.4" stroke-linecap="round"/>
+  <g fill="#9fd3ef">
+    <path d="M14.6 28.4 12 26l2.6-2.4zM21.4 23.6 24 26l-2.6 2.4z"/>
+  </g>
+</svg>

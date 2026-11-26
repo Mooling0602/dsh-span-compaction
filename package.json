@@ -1,0 +1,105 @@
+{
+  "name": "dsh-span-compaction",
+  "version": "0.1.1",
+  "description": "A DSH compaction engine that keeps one summarization call inside a replay budget, with model-driven compaction tools and a context-pressure reminder.",
+  "license": "MIT",
+  "type": "module",
+  "main": "dists/index.js",
+  "exports": {
+    ".": "./dists/index.js",
+    "./client": "./dist/client.js",
+    "./icon": "./icon.svg",
+    "./locale/*.json": "./locale/*.json",
+    "./cordis.patch.yml": "./cordis.patch.yml",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist",
+    "dists",
+    "locale",
+    "icon.svg",
+    "cordis.patch.yml",
+    "INTRODUCTION.md",
+    "INTRODUCTION.zh.md",
+    "README.md",
+    "README.zh.md",
+    "LICENSE"
+  ],
+  "dsh": {
+    "engines": {
+      "dsh": ">=0.2.3-alpha.2"
+    },
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "platform": "web",
+      "immediately": true,
+      "inject": [
+        "@deepseek-ai/dsh-client-locale",
+        "@deepseek-ai/dsh-client-ui-settings",
+        "@deepseek-ai/dsh-client-ui-primitives"
+      ],
+      "external": [
+        "@deepseek-ai/dsh-client-store",
+        "@deepseek-ai/dsh-client-ui-primitives"
+      ]
+    }
+  },
+  "engines": {
+    "node": ">=24.0.0"
+  },
+  "keywords": [
+    "dsh",
+    "dsh-plugin",
+    "compaction",
+    "context",
+    "summarization"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json && node scripts/build-client.mjs",
+    "build:client": "node scripts/build-client.mjs",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "test": "node test/pure.test.ts && node test/engine.test.ts && node test/features.test.ts && node test/settings.test.ts",
+    "test:client": "node test/client-apply.test.mjs && node test/client-render.test.mjs",
+    "check": "npm run build && npm run test && npm run test:client",
+    "prepublishOnly": "npm run check"
+  },
+  "peerDependencies": {
+    "@deepseek-ai/cordis": ">=4.0.0 <5.0.0",
+    "@deepseek-ai/dsh-agent": ">=0.2.0-rc.2 <0.3.0",
+    "@deepseek-ai/dsh-client-ui-primitives": ">=0.2.1-rc.3 <0.3.0",
+    "@deepseek-ai/dsh-compaction": ">=0.2.0-rc.2 <0.3.0",
+    "@deepseek-ai/dsh-compaction-basic": ">=0.2.0-rc.2 <0.3.0",
+    "@deepseek-ai/dsh-tools": ">=0.2.0-rc.2 <0.3.0",
+    "@deepseek-ai/schemastery": ">=3.0.0 <5.0.0"
+  },
+  "devDependencies": {
+    "@deepseek-ai/cordis": "4.2.0-alpha.1",
+    "@deepseek-ai/dsh-agent": "0.2.3-alpha.2",
+    "@deepseek-ai/dsh-agent-preset-registry": "0.2.3-alpha.2",
+    "@deepseek-ai/dsh-client-locale": "^0.2.3-alpha.2",
+    "@deepseek-ai/dsh-client-store": "^0.2.3-alpha.2",
+    "@deepseek-ai/dsh-client-ui-plugin-manager": "^0.2.3-alpha.2",
+    "@deepseek-ai/dsh-client-ui-primitives": "^0.2.3-alpha.2",
+    "@deepseek-ai/dsh-client-ui-renderer": "^0.2.3-alpha.2",
+    "@deepseek-ai/dsh-client-ui-settings": "^0.2.3-alpha.2",
+    "@deepseek-ai/dsh-client-ui-slots": "^0.2.3-alpha.2",
+    "@deepseek-ai/dsh-compaction": "0.2.3-alpha.2",
+    "@deepseek-ai/dsh-compaction-basic": "0.2.3-alpha.2",
+    "@deepseek-ai/dsh-error": "^0.2.3-alpha.2",
+    "@deepseek-ai/dsh-plugin-detail": "^0.2.3-alpha.2",
+    "@deepseek-ai/dsh-scope": "^0.2.3-alpha.2",
+    "@deepseek-ai/dsh-session": "0.2.3-alpha.2",
+    "@deepseek-ai/dsh-token-meter": "0.2.3-alpha.2",
+    "@deepseek-ai/dsh-tools": "0.2.3-alpha.2",
+    "@deepseek-ai/schemastery": "3.20.0-alpha.1",
+    "@types/node": "^22.20.5",
+    "@types/react": "^19.3.3",
+    "@types/react-dom": "^19.3.0",
+    "esbuild": "^0.28.2",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1",
+    "typescript": "^5.9.3"
+  }
+}
