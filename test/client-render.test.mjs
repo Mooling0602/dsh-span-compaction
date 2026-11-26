@@ -87,6 +87,8 @@ const FIELDS = {
   nudgeRatio: { text: '0.7', overridden: false, invalid: false },
   nudgeMinTokens: { text: '50000', overridden: false, invalid: false },
   nudgeEverySteps: { text: '8', overridden: false, invalid: false },
+  approveCompact: { text: 'on', overridden: false, invalid: false },
+  exemptTargets: { text: 'on', overridden: false, invalid: false },
 }
 
 /**
@@ -137,6 +139,8 @@ test('every field is drawn with its own copy', () => {
   assert.match(markup, /提醒上下文比例/)
   assert.match(markup, /触发提醒的最少 token/)
   assert.match(markup, /提醒间隔步数/)
+  assert.match(markup, /压缩前请求确认/)
+  assert.match(markup, /候选列表免审查/)
   assert.match(markup, /默认 160,000/)
 })
 
@@ -152,7 +156,7 @@ test('numbers render as inputs holding the stored value', () => {
 
 test('booleans render as switches reflecting the staged value', () => {
   const markup = render()
-  assert.equal((markup.match(/type="checkbox"/g) ?? []).length, 2)
+  assert.equal((markup.match(/type="checkbox"/g) ?? []).length, 4)
   assert.match(markup, /aria-label="压缩工具" readOnly="" checked=""/)
   assert.match(markup, /aria-label="上下文压力提醒" readOnly=""\/>/)
   assert.doesNotMatch(markup, /aria-label="上下文压力提醒" readOnly="" checked/)

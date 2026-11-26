@@ -25,6 +25,7 @@ export type LocaleKey =
   | 'ratio' | 'ratioHint'
   | 'minTokens' | 'minTokensHint'
   | 'everySteps' | 'everyStepsHint'
+  | 'approval' | 'approvalHint' | 'targets' | 'targetsHint'
   | 'overridden' | 'reset' | 'invalid'
   | 'unavailable' | 'readOnly' | 'saveFailed' | 'save' | 'saving'
 
@@ -46,6 +47,10 @@ export const en: Record<LocaleKey, string> = {
   minTokensHint: 'Default 100,000. With an unknown context window, twice this count is required.',
   everySteps: 'Steps between reminders',
   everyStepsHint: 'Default 10. Context must also grow by at least 2%.',
+  approval: 'Ask before compacting',
+  approvalHint: 'Default on. The model waits for your approval before compact replaces retained history; Full access never prompts.',
+  targets: 'Exempt the candidate list',
+  targetsHint: 'Default on. compact_targets skips downstream pre-execute policy, including Auto review, so listing adds no review request.',
   overridden: 'Overridden',
   reset: 'Reset to inherited value',
   invalid: 'Enter a number, or leave blank to use the default.',
@@ -74,6 +79,10 @@ export const zh: Record<LocaleKey, string> = {
   minTokensHint: '默认 100,000。模型窗口未知时，需达到该数值的两倍。',
   everySteps: '提醒间隔步数',
   everyStepsHint: '默认 10。上下文还须增长至少 2%。',
+  approval: '压缩前请求确认',
+  approvalHint: '默认开启。模型执行 compact 会先等你确认；“完全权限”档不弹窗。',
+  targets: '候选列表免审查',
+  targetsHint: '默认开启。compact_targets 跳过下游预执行策略（含自动审查），列候选不产生额外审查请求。',
   overridden: '已覆盖',
   reset: '恢复继承值',
   invalid: '请输入数字；留空表示使用默认值。',

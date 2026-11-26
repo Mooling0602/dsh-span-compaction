@@ -23,6 +23,8 @@ export const FIELDS = [
   { field: 'nudgeRatio', kind: 'number', label: 'ratio', hint: 'ratioHint' },
   { field: 'nudgeMinTokens', kind: 'number', label: 'minTokens', hint: 'minTokensHint' },
   { field: 'nudgeEverySteps', kind: 'number', label: 'everySteps', hint: 'everyStepsHint' },
+  { field: 'approveCompact', kind: 'switch', label: 'approval', hint: 'approvalHint' },
+  { field: 'exemptTargets', kind: 'switch', label: 'targets', hint: 'targetsHint' },
 ] as const
 
 /** One control's declaration. */

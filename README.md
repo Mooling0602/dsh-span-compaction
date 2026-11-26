@@ -157,6 +157,8 @@ revision-fenced mutation. Leaving the page drops whatever was not saved.
 | `nudgeRatio` | `0.2` | Fraction of the model window that starts the reminder. |
 | `nudgeMinTokens` | `100000` | Absolute token floor below which no reminder fires. |
 | `nudgeEverySteps` | `10` | Minimum admitted steps between two reminders for one agent. |
+| `approveCompact` | `true` | Ask for consent before the model runs `compact`; Full access never prompts. |
+| `exemptTargets` | `true` | Let `compact_targets` bypass downstream pre-execute policy, including Auto review. |
 
 Automatic compaction fires when the priced context reaches `thresholdRatio` of
 the *routed model's declared* window. That window is often much larger than a
@@ -170,6 +172,17 @@ The keys are flat because the shared form model addresses a control by its own
 field name inside the section; a nested object would have no control that could
 edit it. Every key is volatile, so a save applies to the next step or the next
 compaction pass without restarting the entry.
+
+### Approval gate
+
+`compact` replaces retained history, so under an interactive approval policy the
+model now waits for your consent before the call runs. The gate is the outermost
+`tools/pre-execute` listener and reads the session's approval policy: Full access
+(`never`) keeps its no-prompt contract, and every `ask` preset — including Auto —
+shows the approval card. `compact_targets` is exempt instead: it only lists
+candidates, so it skips the whole downstream chain, including the Auto review
+request that would otherwise resend the retained history for every listing.
+`approveCompact` and `exemptTargets` turn either half off.
 
 Every stock engine key still applies and can be set in `cordis.patch.yml`:
 

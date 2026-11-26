@@ -12,6 +12,7 @@ import { Context } from '@deepseek-ai/cordis'
 import { installPresetGate, isProfileEntry } from './gate.ts'
 import { mountHooks, type HooksConfig } from './hooks.ts'
 import { installLiveBudget, readLive, type LiveValue } from './live-config.ts'
+import { installToolGate, type ApprovalConfig } from './approval.ts'
 
 const CORDIS_INIT = Symbol.for('cordis.init')
 
@@ -82,6 +83,10 @@ export default class SpanCompaction {
       // are global, so exactly one entry may mount them. `tools` is optional in
       // this composition: without it the engine still compacts.
       const hooks = config as HooksConfig
+      // The gate is global like the tools: `compact` waits for consent and
+      // `compact_targets` bypasses downstream policy (such as Auto review) from
+      // whichever preset's engine would otherwise handle the call.
+      installToolGate(ctx, config as ApprovalConfig)
       ctx.inject(['tools'], inner => inner.effect(
         () => mountHooks(inner, hooks),
         'dsh-span-compaction: tools and reminder',

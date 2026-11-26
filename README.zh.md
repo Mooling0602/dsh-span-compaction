@@ -87,6 +87,12 @@ profile patch 无法定位嵌在 agent 预设内部的 entry，而每个会话�
 | `nudgeRatio` | `0.2` | 触发提醒所需的模型窗口占比。 |
 | `nudgeMinTokens` | `100000` | 低于该绝对 token 底线时不发提醒。 |
 | `nudgeEverySteps` | `10` | 同一 agent 两次提醒之间至少间隔的放行步数。 |
+| `approveCompact` | `true` | 模型执行 `compact` 前请求确认；“完全权限”档不弹窗。 |
+| `exemptTargets` | `true` | `compact_targets` 跳过下游预执行策略（含自动审查）。 |
+
+### 审批门槛
+
+`compact` 会用摘要替换保留的历史，因此只要会话的审批策略是交互式的，模型就会先等你确认。这个门槛是 `tools/pre-execute` 最外层的监听器，只看会话的审批策略：“完全权限”（`never`）保持不弹窗的约定，其余 `ask` 档——包括 Auto——都会弹出审批卡。`compact_targets` 则相反地豁免：它只列候选，所以会跳过整条下游链，包括 Auto 审查——否则每次列候选都要把整段保留历史再发一遍。`approveCompact` 与 `exemptTargets` 可以分别关掉这两半。
 
 自动压缩在计费上下文达到**路由模型声明窗口**的 `thresholdRatio` 时触发。这个窗口通常远大于真实会话：原生 DeepSeek 适配器为 `deepseek-flash` 声明 1,048,576 token，`0.8` 就接近 840,000 token。单个会话会先碰到提醒（窗口的 0.2，或 `nudgeMinTokens`），远早于自动压缩；如果希望普通会话也能触发自动压缩，就把 `thresholdRatio` 调低。
 

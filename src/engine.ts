@@ -28,6 +28,7 @@ import { planSpanCut } from './span.ts'
 import { effectiveBudget, readLive, type LiveValue } from './live-config.ts'
 import type { ResolvedConfig } from '@deepseek-ai/dsh-compaction-basic'
 import { type HooksConfig } from './hooks.ts'
+import type { ApprovalConfig } from './approval.ts'
 import { DEFAULT_NUDGE_EVERY_STEPS, DEFAULT_NUDGE_MIN_TOKENS, DEFAULT_NUDGE_RATIO } from './nudge.ts'
 
 /** Default per-pass replay budget, in route-priced tokens. */
@@ -65,7 +66,7 @@ const modelPolicy = z.object({
 })
 
 /** Stock keys plus the keys this plugin owns. */
-interface SpanCompactionConfig extends Omit<BasicCompactionConfig, 'thresholdRatio'>, HooksConfig {
+interface SpanCompactionConfig extends Omit<BasicCompactionConfig, 'thresholdRatio'>, HooksConfig, ApprovalConfig {
   /** Live because the settings page edits it; the stock resolver takes a number. */
   thresholdRatio?: LiveValue<number>
   spanBudgetTokens?: LiveValue<number>
@@ -119,6 +120,12 @@ export default class SpanCompactionEngine extends BasicCompactionEngine {
     nudgeEverySteps: z.number().step(1).min(1).default(DEFAULT_NUDGE_EVERY_STEPS)
       .description('Minimum steps between reminders; context must also grow by at least 2%.')
       .i18n({ zh: '提醒至少间隔的步数；上下文还须增长至少 2%。' }).volatile(),
+    approveCompact: z.boolean().default(true)
+      .description('Ask for consent before `compact` runs: the call replaces retained history. Full access keeps its no-prompt contract.')
+      .i18n({ zh: '模型调用 compact 前请求用户确认：该调用会用摘要替换历史；“完全权限”保持不弹窗的约定。' }).volatile(),
+    exemptTargets: z.boolean().default(true)
+      .description('Let `compact_targets` bypass downstream pre-execute policy, including Auto review. It only lists candidates.')
+      .i18n({ zh: 'compact_targets 跳过下游预执行策略（含自动审查）：它只列出候选范围。' }).volatile(),
   // The live threshold is a volatile reference, which the stock static type
   // cannot express: `BasicCompactionEngine.Config` declares a plain number. The
   // runtime schema is what the loader and the settings page read.
@@ -144,6 +151,8 @@ export default class SpanCompactionEngine extends BasicCompactionEngine {
       nudgeRatio: _nudgeRatio,
       nudgeMinTokens: _nudgeMinTokens,
       nudgeEverySteps: _nudgeEverySteps,
+      approveCompact: _approveCompact,
+      exemptTargets: _exemptTargets,
       ...stock
     } = config
     // The stock resolver compares numbers, so a volatile reference cannot ride

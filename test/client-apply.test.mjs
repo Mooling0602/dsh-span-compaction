@@ -182,7 +182,7 @@ test('the entry receives its copy and its form controller', () => {
 
 test('the page renders from the official primitives, not a bundled copy', () => {
   assert.equal(typeof exports.SpanSettingsPage, 'function')
-  assert.equal(exports.FIELDS.length, 7)
+  assert.equal(exports.FIELDS.length, 9)
 })
 
 console.log(`\n${passed} checks passed`)

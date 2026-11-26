@@ -38,6 +38,8 @@ test('the page declares one control per setting, flat and in order', () => {
     'nudgeRatio',
     'nudgeMinTokens',
     'nudgeEverySteps',
+    'approveCompact',
+    'exemptTargets',
   ])
   assert.equal(new Set(NAMES).size, NAMES.length)
 })

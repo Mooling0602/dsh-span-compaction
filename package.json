@@ -1,6 +1,6 @@
 {
   "name": "dsh-span-compaction",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "A DSH compaction engine that keeps one summarization call inside a replay budget, with model-driven compaction tools and a context-pressure reminder.",
   "license": "MIT",
   "type": "module",
@@ -60,7 +60,7 @@
     "build": "tsc -p tsconfig.json && node scripts/build-client.mjs",
     "build:client": "node scripts/build-client.mjs",
     "typecheck": "tsc --noEmit -p tsconfig.json",
-    "test": "node test/pure.test.ts && node test/engine.test.ts && node test/features.test.ts && node test/settings.test.ts",
+    "test": "node test/pure.test.ts && node test/approval.test.ts && node test/engine.test.ts && node test/features.test.ts && node test/settings.test.ts",
     "test:client": "node test/client-apply.test.mjs && node test/client-render.test.mjs",
     "check": "npm run build && npm run test && npm run test:client",
     "prepublishOnly": "npm run check"
