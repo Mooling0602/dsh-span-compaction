@@ -7,6 +7,7 @@
 import assert from 'node:assert/strict'
 import { buildReminder, nudgePressure, nextStepCounter } from '../src/nudge.ts'
 import type { NudgeConfig, NudgeState } from '../src/nudge.ts'
+import { planRangeBlocks } from '../src/compress-tool.ts'
 
 let passed = 0
 function test(name: string, body: () => void) {
@@ -167,6 +168,36 @@ test('the reminder names what may not be compressed', () => {
   const text = buildReminder({ tokens: 1, window: 2, ratio: 0.2 })
   assert.match(text, /current task, unanswered user questions, pending decisions/)
   assert.match(text, /already compressed/)
+})
+
+test('ranges split monotonic history into seq intervals', () => {
+  const seqs = Array.from({ length: 20 }, (_, index) => 100 + index)
+  const nodes = seqs.map(seq => ({ seq, tokens: 1_000 }))
+  const canStart = seqs.map((_, index) => index).slice(1)
+  const canEnd = Uint8Array.from(seqs.map((_, index) => index === 0 ? 0 : 1))
+  const mass = (from: number, to: number) => (to - from + 1) * 1_000
+  const blocks = planRangeBlocks(nodes, canStart, canEnd, seqs.length - 1, 19_000, mass)
+  assert.ok(blocks.length > 0)
+  for (const block of blocks) assert.ok(seqs[block.from]! <= seqs[block.to]!)
+  assert.equal(blocks[0]!.from, 1)
+  assert.equal(blocks[blocks.length - 1]!.to, seqs.length - 1)
+})
+
+test('a compaction checkpoint head never starts a range', () => {
+  // A checkpoint carries the seq of the event that wrote it, so it sits before a
+  // retained tail whose seqs are older: a block starting there has no valid
+  // start..end interval and must be skipped instead of inverted.
+  const seqs = [8884, 9107, 8737, 8741, 8750, 8760, 8770, 8780, 8790, 8800]
+  const nodes = seqs.map(seq => ({ seq, tokens: 1_000 }))
+  const canStart = seqs.map((_, index) => index).slice(1)
+  const canEnd = Uint8Array.from(seqs.map((_, index) => index === 0 ? 0 : 1))
+  const mass = (from: number, to: number) => (to - from + 1) * 1_000
+  const blocks = planRangeBlocks(nodes, canStart, canEnd, seqs.length - 1, 9_000, mass)
+  assert.ok(blocks.length > 0)
+  for (const block of blocks) {
+    assert.ok(seqs[block.from]! <= seqs[block.to]!)
+    assert.notEqual(block.from, 1)
+  }
 })
 
 console.log(`\n${passed} checks passed`)

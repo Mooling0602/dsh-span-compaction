@@ -189,6 +189,77 @@ function spanTokens(prefix, from, to) {
     return prefix[to] - (from > 0 ? prefix[from - 1] : 0);
 }
 /**
+ * Choose the ready-made range blocks over the finished surface.
+ *
+ * Block size is a suggestion: the model writes the summary and nothing is
+ * replayed, so the replay budget does not apply here. The last slot absorbs the
+ * remainder so the ranges cover the history.
+ *
+ * A compaction checkpoint keeps the seq of the event that wrote it, so a block
+ * that begins at one carries a newer seq than the retained tail that follows.
+ * Such a block cannot be expressed as one `start..end` interval — a seq range
+ * would either exclude the checkpoint or swallow the tail — so it is left out of
+ * `ranges`; `targets` still offers the checkpoint alone.
+ *
+ * @param nodes - surface nodes in head-to-tail order.
+ * @param canStart - surface indices whose leading cut is balanced.
+ * @param canEnd - one flag per surface index whose trailing cut is balanced.
+ * @param lastIndex - last surface index that may end a block.
+ * @param compactableTokens - priced tokens of the finished history.
+ * @param mass - priced tokens between two surface indices, inclusive.
+ * @param maxRanges - most blocks to emit.
+ * @param minRangeTokens - smallest block worth offering.
+ * @returns the blocks, in surface order.
+ */
+export function planRangeBlocks(nodes, canStart, canEnd, lastIndex, compactableTokens, mass, maxRanges = MAX_RANGES, minRangeTokens = MIN_RANGE_TOKENS) {
+    const blocks = [];
+    if (canStart.length < 2 || compactableTokens < minRangeTokens)
+        return blocks;
+    const lastBalancedEnd = (from) => {
+        for (let index = lastIndex; index >= from; index -= 1) {
+            if (canEnd[index] === 1)
+                return index;
+        }
+        return -1;
+    };
+    const targetMass = Math.max(minRangeTokens, Math.round(compactableTokens / maxRanges));
+    let cursor = 1;
+    let startIndex = canStart[0];
+    while (blocks.length < maxRanges && cursor <= canStart.length) {
+        let endIndex = -1;
+        if (blocks.length === maxRanges - 1) {
+            endIndex = lastBalancedEnd(startIndex);
+        }
+        else {
+            for (let index = startIndex; index <= lastIndex; index += 1) {
+                if (canEnd[index] === 1 && mass(startIndex, index) >= targetMass) {
+                    endIndex = index;
+                    break;
+                }
+            }
+            if (endIndex < 0)
+                endIndex = lastBalancedEnd(startIndex);
+        }
+        if (endIndex < startIndex || nodes[startIndex].seq > nodes[endIndex].seq) {
+            // A checkpoint head: start the next block at the next balanced point
+            // instead of emitting an interval whose end seq is lower than its start.
+            if (cursor >= canStart.length)
+                break;
+            startIndex = canStart[cursor];
+            cursor += 1;
+            continue;
+        }
+        blocks.push({ from: startIndex, to: endIndex });
+        while (cursor < canStart.length && canStart[cursor] <= endIndex)
+            cursor += 1;
+        if (cursor >= canStart.length)
+            break;
+        startIndex = canStart[cursor];
+        cursor += 1;
+    }
+    return blocks;
+}
+/**
  * Build the priced, compactable span offers for one session.
  *
  * Two complementary views are returned: `ranges` are ready-made contiguous
@@ -253,57 +324,13 @@ export function buildTargets(ctx, session) {
         nodes: 1,
         preview: previewNode(session, nodes[index].seq),
     }));
-    const ranges = [];
-    const lastIndex = finished - 1;
-    if (canStart.length >= 2 && compactableTokens >= MIN_RANGE_TOKENS) {
-        const pushRange = (from, to) => {
-            ranges.push({
-                start: nodes[from].seq,
-                end: nodes[to].seq,
-                tokens: spanTokens(prefix, from, to),
-                nodes: to - from + 1,
-                preview: previewNode(session, nodes[from].seq),
-            });
-        };
-        const lastBalancedEnd = (from) => {
-            for (let index = lastIndex; index >= from; index -= 1) {
-                if (canEnd[index] === 1)
-                    return index;
-            }
-            return -1;
-        };
-        // Block size is a suggestion: the model writes the summary, nothing is
-        // replayed, so the replay budget does not apply here.
-        const targetMass = Math.max(MIN_RANGE_TOKENS, Math.round(compactableTokens / MAX_RANGES));
-        let startIndex = canStart[0];
-        let cursor = 1;
-        while (ranges.length < MAX_RANGES) {
-            let endIndex = -1;
-            if (ranges.length === MAX_RANGES - 1) {
-                // The last slot absorbs the remainder so the ranges cover the history.
-                endIndex = lastBalancedEnd(startIndex);
-            }
-            else {
-                for (let index = startIndex; index <= lastIndex; index += 1) {
-                    if (canEnd[index] === 1 && spanTokens(prefix, startIndex, index) >= targetMass) {
-                        endIndex = index;
-                        break;
-                    }
-                }
-                if (endIndex < 0)
-                    endIndex = lastBalancedEnd(startIndex);
-            }
-            if (endIndex < startIndex)
-                break;
-            pushRange(startIndex, endIndex);
-            while (cursor < canStart.length && canStart[cursor] <= endIndex)
-                cursor += 1;
-            if (cursor >= canStart.length)
-                break;
-            startIndex = canStart[cursor];
-            cursor += 1;
-        }
-    }
+    const ranges = planRangeBlocks(nodes, canStart, canEnd, finished - 1, compactableTokens, (from, to) => spanTokens(prefix, from, to)).map(block => ({
+        start: nodes[block.from].seq,
+        end: nodes[block.to].seq,
+        tokens: spanTokens(prefix, block.from, block.to),
+        nodes: block.to - block.from + 1,
+        preview: previewNode(session, nodes[block.from].seq),
+    }));
     return {
         targets,
         ranges,
