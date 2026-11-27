@@ -12,6 +12,7 @@ import { installPresetGate, isProfileEntry } from "./gate.js";
 import { mountHooks } from "./hooks.js";
 import { installLiveBudget, readLive } from "./live-config.js";
 import { installToolGate } from "./approval.js";
+import { conflictError, incompatiblePlugins } from "./conflicts.js";
 const CORDIS_INIT = Symbol.for('cordis.init');
 let Engine = null;
 let Stock = null;
@@ -52,7 +53,7 @@ export default class SpanCompaction {
     static inject = Stock?.BasicCompactionEngine?.inject ?? ['llm', 'tokenMeter', 'sessions', 'sessionProjections'];
     static Config = Engine?.Config ?? Stock?.BasicCompactionEngine?.Config ?? Schema?.object({});
     constructor(ctx, config = {}) {
-        const failure = unavailable();
+        const failure = unavailable() ?? conflictError(incompatiblePlugins(ctx));
         if (failure !== undefined) {
             // Report the failure from activation so the loader attributes it to this
             // entry instead of leaving a half-mounted composition. A constructor may
@@ -63,6 +64,19 @@ export default class SpanCompaction {
         // Only the profile-level row publishes the shared budget; preset instances
         // read it through `effectiveBudget` without remounting.
         if (isProfileEntry(ctx)) {
+            ctx.on('plugin-manager/changed', () => {
+                try {
+                    if (incompatiblePlugins(ctx).length === 0)
+                        return;
+                    const fibers = [...(ctx.fiber.runtime?.fibers ?? [ctx.fiber])]
+                        .filter(fiber => fiber.state === 1 || fiber.state === 2);
+                    for (const fiber of fibers)
+                        void fiber.restart().catch(error => ctx.logger.warn(error));
+                }
+                catch (error) {
+                    ctx.logger.warn(error);
+                }
+            }, { global: true });
             installLiveBudget(ctx, () => readLive(config.spanBudgetTokens)
                 ?? DEFAULT_SPAN_BUDGET_TOKENS);
             // The tools and the reminder are this bundle's only runtime hooks and they

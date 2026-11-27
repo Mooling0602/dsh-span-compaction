@@ -25,8 +25,10 @@ export const STOCK_ENGINE = '@deepseek-ai/dsh-compaction-basic'
 /** Specifier the loader resolves to this plugin's entry. */
 export const PLUGIN_NAME = 'dsh-span-compaction'
 
-/** Compressors whose presence means a second engine folds the same session. */
-const COMPETING = new Set(['billion-context', 'bili-native'])
+/** Incompatible plugin IDs and their component identifiers; add future plugins here. */
+export const COMPETING_COMPONENTS: Record<string, readonly string[]> = {
+  'billion-context': ['billion-context', 'bili-native'],
+}
 
 /** Cordis fiber states during which a plugin actually runs (LOADING, ACTIVE). */
 const RUNNING = new Set([1, 2])
@@ -51,9 +53,11 @@ export function competingCompressors(ctx: Context): string[] {
   try {
     for (const runtime of registry.values()) {
       const name = runtime?.name
-      if (name === undefined || !COMPETING.has(name)) continue
+      if (name === undefined) continue
+      const plugin = Object.entries(COMPETING_COMPONENTS).find(([id, components]) => id === name || components.includes(name))?.[0]
+      if (plugin === undefined) continue
       const running = [...(runtime.fibers ?? [])].some(fiber => fiber !== undefined && RUNNING.has(fiber.state))
-      if (running && !found.includes(name)) found.push(name)
+      if (running && !found.includes(plugin)) found.push(plugin)
     }
   } catch {
     // A host that cannot enumerate its registry simply has no known competitor.
@@ -194,13 +198,6 @@ export function installPresetGate(ctx: Context, config: { takeoverPresets?: bool
   const depth = entryDepth(ctx)
   const previous = installedGates.get(root)
   if (previous !== undefined && (previous.active || depth > previous.depth)) return
-  const peers = competingCompressors(ctx)
-  if (peers.length > 0) {
-    ctx.logger.warn(
-      `span compaction: ${peers.join(', ')} is also mounted and folds requests in front of this engine; `
-        + 'remove it from dsh.profile.bundles to compact in one place',
-    )
-  }
   const gate = { depth, active: true }
   installedGates.set(root, gate)
   ctx.effect(() => () => {

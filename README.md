@@ -91,13 +91,11 @@ anywhere else are renamed only when the host left them enabled.
 
 ## Note on request-layer proxies
 
-A proxy that folds requests on the way out (billion-context's `bili-native`) and
+A proxy that folds requests on the way out ([billion-context](https://github.com/ranxianglei/billion-context)'s `bili-native`) and
 a surface engine compact the same session in two different places. Only one of
 them can own that decision: the surface engine rewrites what the session itself
 derives, so every consumer — periodic reports, subagents, replay — sees the
-compacted history, while a request-layer fold is invisible to all of them. Mount
-this plugin and remove the competing proxy compressor from
-`dsh.profile.bundles`; the plugin logs a warning when both are running.
+compacted history, while a request-layer fold is invisible to all of them. The plugin refuses to start when a listed incompatible bundle is enabled or a competing plugin is running; disable or uninstall the competing bundle, or disable its competing component, and reload this component, or use the competing plugin instead. The hard-coded conflict list currently includes the plugin ID `billion-context`; `bili-native` is one of its components.
 
 ## Model-driven compaction
 
