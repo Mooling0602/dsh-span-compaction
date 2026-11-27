@@ -16,7 +16,7 @@ import { test } from 'node:test'
 import { localFiles, languageChain, readPackageDocument } from '@deepseek-ai/dsh-plugin-detail'
 
 /** The configuration keys the settings page edits. */
-const FLAT_KEYS = ['spanBudgetTokens', 'thresholdRatio', 'toolsEnabled', 'nudgeEnabled', 'nudgeRatio', 'nudgeMinTokens', 'nudgeEverySteps', 'approveCompact', 'exemptTargets']
+const FLAT_KEYS = ['spanBudgetTokens', 'thresholdRatio', 'toolsEnabled', 'nudgeEnabled', 'nudgeRatio', 'nudgeStrongRatio', 'nudgeMinTokens', 'nudgeEverySteps', 'approveCompact', 'exemptTargets']
 
 assert.ok(existsSync('dists/index.js'), 'the Host half is not built: run npm run build')
 assert.ok(existsSync('dist/client.js'), 'the browser half is not built: run npm run build')

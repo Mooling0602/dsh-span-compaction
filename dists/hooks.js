@@ -33,6 +33,7 @@ export function mountHooks(ctx, config) {
     const stopNudge = registerNudge(ctx, () => ({
         enabled: toolsEnabled() && readLive(config.nudgeEnabled) !== false,
         ratio: readLive(config.nudgeRatio),
+        strongRatio: readLive(config.nudgeStrongRatio),
         minTokens: readLive(config.nudgeMinTokens),
         everySteps: readLive(config.nudgeEverySteps),
     }));

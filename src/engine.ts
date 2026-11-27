@@ -28,7 +28,7 @@ import { effectiveBudget, readLive, type LiveValue } from './live-config.ts'
 import type { ResolvedConfig } from '@deepseek-ai/dsh-compaction-basic'
 import { type HooksConfig } from './hooks.ts'
 import type { ApprovalConfig } from './approval.ts'
-import { DEFAULT_NUDGE_EVERY_STEPS, DEFAULT_NUDGE_MIN_TOKENS, DEFAULT_NUDGE_RATIO } from './nudge.ts'
+import { DEFAULT_NUDGE_EVERY_STEPS, DEFAULT_NUDGE_MIN_TOKENS, DEFAULT_NUDGE_RATIO, DEFAULT_NUDGE_STRONG_RATIO } from './nudge.ts'
 
 /** Default per-pass replay budget, in route-priced tokens. */
 export const DEFAULT_SPAN_BUDGET_TOKENS = 160_000
@@ -113,6 +113,9 @@ export default class SpanCompactionEngine extends BasicCompactionEngine {
     nudgeRatio: z.number().min(0.01).max(1).default(DEFAULT_NUDGE_RATIO)
       .description('Context window ratio (0.01–1). Both this ratio and the token floor must be reached.')
       .i18n({ zh: '上下文窗口占比（0.01–1）：需同时达到此比例和最低 token 数。' }).volatile(),
+    nudgeStrongRatio: z.number().min(0.01).max(1).default(DEFAULT_NUDGE_STRONG_RATIO)
+      .description('Strong reminder threshold (0.01–1): at this share of the window every step carries a short reminder, and a new turn starts with one. A declined compaction pauses it for the rest of that turn only.')
+      .i18n({ zh: '强提醒阈值（0.01–1）：达到窗口该比例后每一步都附带简短提醒，新一轮开始时也会提醒；用户拒绝压缩只暂停当前轮次的强提醒。' }).volatile(),
     nudgeMinTokens: z.number().step(1).min(0).default(DEFAULT_NUDGE_MIN_TOKENS)
       .description('Minimum tokens for a reminder. With an unknown window, twice this count is required.')
       .i18n({ zh: '提醒最低 token 数；模型窗口未知时，需达到该数值的两倍。' }).volatile(),
@@ -148,6 +151,7 @@ export default class SpanCompactionEngine extends BasicCompactionEngine {
       toolsEnabled: _toolsEnabled,
       nudgeEnabled: _nudgeEnabled,
       nudgeRatio: _nudgeRatio,
+      nudgeStrongRatio: _nudgeStrongRatio,
       nudgeMinTokens: _nudgeMinTokens,
       nudgeEverySteps: _nudgeEverySteps,
       approveCompact: _approveCompact,

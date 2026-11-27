@@ -5,7 +5,7 @@
  */
 
 import assert from 'node:assert/strict'
-import { buildReminder, nudgePressure, nextStepCounter } from '../src/nudge.ts'
+import { buildReminder, buildStrongReminder, buildTurnReminder, nudgePressure, nextStepCounter } from '../src/nudge.ts'
 import type { NudgeConfig, NudgeState } from '../src/nudge.ts'
 import { planRangeBlocks } from '../src/compress-tool.ts'
 
@@ -34,6 +34,7 @@ async function atest(name: string, body: () => Promise<void>) {
 const cfg = (over: Partial<Required<NudgeConfig>> = {}): Required<NudgeConfig> => ({
   enabled: true,
   ratio: 0.7,
+  strongRatio: 0.25,
   minTokens: 50_000,
   everySteps: 8,
   ...over,
@@ -58,13 +59,13 @@ test('nudge fires above the ratio with no prior state', () => {
 
 test('nudge respects the step frequency limit', () => {
   const state: NudgeState = { lastStep: 4, lastTokens: 80_000 }
-  assert.equal(nudgePressure(90_000, 100_000, 8, state, cfg()).nudge, false)
-  assert.equal(nudgePressure(90_000, 100_000, 12, state, cfg()).nudge, true)
+  assert.equal(nudgePressure(90_000, 100_000, 8, state, cfg(), { strongEnabled: false }).nudge, false)
+  assert.equal(nudgePressure(90_000, 100_000, 12, state, cfg(), { strongEnabled: false }).nudge, true)
 })
 
 test('nudge does not repeat when pressure barely moved', () => {
   const state: NudgeState = { lastStep: 1, lastTokens: 80_000 }
-  assert.equal(nudgePressure(80_500, 100_000, 20, state, cfg()).nudge, false)
+  assert.equal(nudgePressure(80_500, 100_000, 20, state, cfg(), { strongEnabled: false }).nudge, false)
 })
 
 test('unknown window falls back to twice the token floor', () => {
@@ -90,9 +91,9 @@ test('the step counter keeps counting across turn boundaries', () => {
 test('a reminder after a turn boundary is measured on the counter, not the turn step', () => {
   const state: NudgeState = { lastStep: 3, lastTokens: 80_000 }
   // The event's own step restarts at 1, which would make the interval negative.
-  assert.equal(nudgePressure(90_000, 100_000, 1, state, cfg()).nudge, false)
+  assert.equal(nudgePressure(90_000, 100_000, 1, state, cfg(), { strongEnabled: false }).nudge, false)
   // The monotonic counter reports the real interval, so the reminder fires.
-  assert.equal(nudgePressure(90_000, 100_000, 6, state, cfg({ everySteps: 3 })).nudge, true)
+  assert.equal(nudgePressure(90_000, 100_000, 6, state, cfg({ everySteps: 3 }), { strongEnabled: false }).nudge, true)
 })
 
 // --- engine one-shot model summary injection ---
@@ -157,27 +158,88 @@ test('the reminder says the target list is not the limit of what may be compacte
   assert.match(text, /model window unknown/)
 })
 
-test('the reminder prefers safe pauses without demanding that work stop', () => {
+test('the interval reminder compacts at a safe pause instead of waiting for the end', () => {
   const text = buildReminder({ tokens: 1, window: 2, ratio: 0.2 })
-  assert.match(text, /Compact at the next safe pause/)
-  assert.match(text, /would interrupt ongoing work or the user declines this compaction request, finish the task first/)
-  assert.match(text, /Do not ask again mid-task/)
+  assert.match(text, /Compact at a safe pause rather than waiting for the task to end/)
+  assert.match(text, /If compacting now would interrupt the current work, defer/)
+  assert.match(text, /revisit at the next safe pause and before sending your final reply/)
+  assert.match(text, /Make one attempt with normal approval/)
+  assert.match(text, /if declined, send the final reply without asking again/)
+  assert.match(text, /Older finished turns are fair game even while the task continues/)
+  assert.match(text, /checkpoints and injected reminders are already compressed/)
   assert.doesNotMatch(text, /Compact now, in this turn/)
 })
 
-test('a deferred reminder asks for one worthwhile attempt at completion, with approval', () => {
-  const text = buildReminder({ tokens: 1, window: 2, ratio: 0.2 })
-  assert.match(text, /recheck compact_targets when the task is done, before sending your final reply/)
-  assert.match(text, /one attempt with normal approval if there is still a worthwhile range in older, finished history/)
-  assert.match(text, /Skip it if the user asked you not to retry/)
-  assert.match(text, /if declined again, send the final reply without asking again/)
+test('the strong reminder judges every step and never waits for the task to end', () => {
+  const text = buildStrongReminder({ tokens: 1, window: 2, ratio: 0.2 })
+  assert.match(text, /Each step, judge whether a safe cut point exists now/)
+  assert.match(text, /Do not wait for the task to end/)
+  assert.match(text, /If the user declined a compaction or asked you not to retry/)
 })
 
-test('the reminder names what may not be compressed', () => {
-  const text = buildReminder({ tokens: 1, window: 2, ratio: 0.2 })
-  assert.match(text, /current task, unanswered user questions, pending decisions/)
-  assert.match(text, /The current turn is not a candidate even at task completion/)
-  assert.match(text, /already compressed/)
+test('the turn reminder compacts before the new task starts', () => {
+  const text = buildTurnReminder({ tokens: 1, window: 2, ratio: 0.2 })
+  assert.match(text, /A new task starts while context is still large/)
+  assert.match(text, /Before you begin/)
+  assert.match(text, /start the task normally/)
+})
+
+test('a new turn above the threshold nudges without waiting for the step interval', () => {
+  const state = { lastStep: 100, lastTokens: 90_000 }
+  const r = nudgePressure(90_000, 100_000, 101, state, cfg({ ratio: 0.5, strongRatio: 0.95 }), { turnStart: true })
+  assert.equal(r.nudge, true)
+  assert.equal(r.reason, 'turn')
+  assert.deepEqual(r.state, { lastStep: 101, lastTokens: 90_000 })
+})
+
+test('a turn start above the strong threshold opens with the strong cadence', () => {
+  const state = { lastStep: 100, lastTokens: 90_000 }
+  const r = nudgePressure(80_000, 100_000, 101, state, cfg({ ratio: 0.2, strongRatio: 0.75 }), { turnStart: true })
+  assert.equal(r.nudge, true)
+  assert.equal(r.reason, 'strong')
+})
+
+test('the strong threshold nudges on every step', () => {
+  const state = { lastStep: 100, lastTokens: 90_000 }
+  const r = nudgePressure(80_000, 100_000, 101, state, cfg({ ratio: 0.2, strongRatio: 0.75 }))
+  assert.equal(r.nudge, true)
+  assert.equal(r.reason, 'strong')
+})
+
+test('below the strong threshold the same step waits for the interval', () => {
+  const state = { lastStep: 100, lastTokens: 90_000 }
+  const r = nudgePressure(80_000, 100_000, 101, state, cfg({ ratio: 0.2, strongRatio: 0.9 }))
+  assert.equal(r.nudge, false)
+  assert.equal(r.reason, undefined)
+})
+
+test('a declined compaction pauses only the current turn strong cadence', () => {
+  const state = { lastStep: 100, lastTokens: 70_000 }
+  const paused = nudgePressure(80_000, 100_000, 101, state, cfg({ ratio: 0.2, strongRatio: 0.75 }), { strongEnabled: false })
+  assert.equal(paused.nudge, false)
+  const resumed = nudgePressure(80_000, 100_000, 102, state, cfg({ ratio: 0.2, strongRatio: 0.75 }), { strongEnabled: true })
+  assert.equal(resumed.nudge, true)
+  assert.equal(resumed.reason, 'strong')
+})
+
+test('the turn-start reminder survives a declined compaction', () => {
+  const state = { lastStep: 100, lastTokens: 70_000 }
+  const r = nudgePressure(80_000, 100_000, 101, state, cfg({ ratio: 0.2, strongRatio: 0.75 }), { strongEnabled: false, turnStart: true })
+  assert.equal(r.nudge, true)
+  assert.equal(r.reason, 'turn')
+})
+
+test('an interval reminder still follows while strong is paused', () => {
+  const state = { lastStep: 100, lastTokens: 70_000 }
+  const ready = nudgePressure(90_000, 100_000, 110, state, cfg({ ratio: 0.2, strongRatio: 0.75, everySteps: 5 }), { strongEnabled: false })
+  assert.equal(ready.nudge, true)
+  assert.equal(ready.reason, 'interval')
+})
+
+test('the strong cadence needs a known window', () => {
+  const state = { lastStep: 1, lastTokens: 90_000 }
+  const r = nudgePressure(120_000, undefined, 2, state, cfg({ ratio: 0.2, strongRatio: 0.25, minTokens: 50_000 }))
+  assert.equal(r.nudge, false)
 })
 
 test('ranges split monotonic history into seq intervals', () => {

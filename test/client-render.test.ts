@@ -79,6 +79,7 @@ const FIELDS: SpanFieldStates = {
   toolsEnabled: { text: 'on', overridden: false, invalid: false },
   nudgeEnabled: { text: 'off', overridden: true, invalid: false },
   nudgeRatio: { text: '0.7', overridden: false, invalid: false },
+  nudgeStrongRatio: { text: '0.25', overridden: false, invalid: false },
   nudgeMinTokens: { text: '50000', overridden: false, invalid: false },
   nudgeEverySteps: { text: '8', overridden: false, invalid: false },
   approveCompact: { text: 'on', overridden: false, invalid: false },

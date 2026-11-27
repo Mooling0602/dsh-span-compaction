@@ -23,6 +23,7 @@ export type LocaleKey =
   | 'tools' | 'toolsHint'
   | 'nudge' | 'nudgeHint'
   | 'ratio' | 'ratioHint'
+  | 'strongRatio' | 'strongRatioHint'
   | 'minTokens' | 'minTokensHint'
   | 'everySteps' | 'everyStepsHint'
   | 'approval' | 'approvalHint' | 'targets' | 'targetsHint'
@@ -43,6 +44,8 @@ export const en: Record<LocaleKey, string> = {
   nudgeHint: 'Default on. A reminder only suggests compaction; it never runs one by itself.',
   ratio: 'Reminder context ratio',
   ratioHint: 'Default 0.2. Above 0 and at most 1; the token floor must be reached as well.',
+  strongRatio: 'Strong reminder threshold',
+  strongRatioHint: 'Default 0.25. At this share of the window every step carries a short reminder, and a new turn opens with the strong one; a declined compaction pauses it for the rest of that turn only.',
   minTokens: 'Minimum tokens before a reminder',
   minTokensHint: 'Default 100,000. With an unknown context window, twice this count is required.',
   everySteps: 'Steps between reminders',
@@ -75,6 +78,8 @@ export const zh: Record<LocaleKey, string> = {
   nudgeHint: '默认开启。提醒只建议压缩，不会自行执行压缩。',
   ratio: '提醒上下文比例',
   ratioHint: '默认 0.2。大于 0 且不超过 1，并需同时达到最低 token 数。',
+  strongRatio: '强提醒阈值',
+  strongRatioHint: '默认 0.25。达到窗口该比例后每一步都附带简短提醒，新一轮开始也直接用强提醒；用户拒绝压缩只暂停当前轮次的强提醒。',
   minTokens: '触发提醒的最少 token',
   minTokensHint: '默认 100,000。模型窗口未知时，需达到该数值的两倍。',
   everySteps: '提醒间隔步数',

@@ -18,6 +18,7 @@ export const FIELDS = [
     { field: 'toolsEnabled', kind: 'switch', label: 'tools', hint: 'toolsHint' },
     { field: 'nudgeEnabled', kind: 'switch', label: 'nudge', hint: 'nudgeHint' },
     { field: 'nudgeRatio', kind: 'number', label: 'ratio', hint: 'ratioHint' },
+    { field: 'nudgeStrongRatio', kind: 'number', label: 'strongRatio', hint: 'strongRatioHint' },
     { field: 'nudgeMinTokens', kind: 'number', label: 'minTokens', hint: 'minTokensHint' },
     { field: 'nudgeEverySteps', kind: 'number', label: 'everySteps', hint: 'everyStepsHint' },
     { field: 'approveCompact', kind: 'switch', label: 'approval', hint: 'approvalHint' },

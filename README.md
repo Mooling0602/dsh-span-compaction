@@ -121,7 +121,7 @@ minus the summary itself. Compacting a few thousand priced tokens with a long
 summary can move the session total by only a percent; pick a span that is much
 larger than the summary you can write for it.
 
-A pre-step nudge (`<span-compaction-reminder>`) quotes the context reading once priced context crosses `nudgeRatio` of the model window **and** `nudgeMinTokens`. If compaction would interrupt work or the user declines that attempt, it tells the model to finish the task and recheck older eligible history before the final reply. The model can try once at that point through the normal approval flow, unless the user asked it not to retry. The nudge never runs compaction itself and is rate-limited by `nudgeEverySteps` plus a pressure-delta guard. Steps count across turns even though each turn's step numbering restarts at 1.
+A pre-step nudge (`<span-compaction-reminder>`) quotes the context reading once priced context crosses `nudgeRatio` of the model window **and** `nudgeMinTokens`. It asks the model to compact at a safe pause — a point where the next step does not depend on older finished history — instead of waiting for the task to end, and while the model defers it repeats at `nudgeEverySteps` with a pressure-delta guard. A new turn that opens above the threshold gets one reminder immediately — the strong reminder when it is already at `nudgeStrongRatio` — so the model can compact before starting the task, and from `nudgeStrongRatio` of the window every step carries a short reminder. The nudge never runs compaction itself. A user who declines a compaction approval pauses the strong cadence for the rest of that turn only; the next turn still opens with its reminder, and the strong cadence resumes while pressure stays above the threshold. Steps count across turns even though each turn's step numbering restarts at 1.
 
 ## Configuration
 
@@ -140,6 +140,7 @@ revision-fenced mutation. Leaving the page drops whatever was not saved.
 | `toolsEnabled` | `true` | Register the `compact_targets` / `compact` tools. |
 | `nudgeEnabled` | `true` | Inject the context-pressure reminder. |
 | `nudgeRatio` | `0.2` | Fraction of the model window that starts the reminder. |
+| `nudgeStrongRatio` | `0.25` | Share of the window from which every step carries a short reminder, and a new turn opens with one. A declined compaction pauses it for the rest of that turn. |
 | `nudgeMinTokens` | `100000` | Absolute token floor below which no reminder fires. |
 | `nudgeEverySteps` | `10` | Minimum admitted steps between two reminders for one agent. |
 | `approveCompact` | `true` | Ask for consent before the model runs `compact`; Full access never prompts. |
@@ -199,9 +200,12 @@ Three limits are worth knowing:
   suppressed while the tools are disabled, because there would be nothing for the
   model to call.
 - A reminder needs both `nudgeRatio` of the window and `nudgeMinTokens`; with an
-  unknown window it needs twice `nudgeMinTokens`. It also waits `nudgeEverySteps`
-  admitted steps and at least 2% growth since the previous reminder. Steps are
-  counted across turns, so a turn boundary cannot suppress the next reminder.
+  unknown window it needs twice `nudgeMinTokens`. A new turn that opens above it
+  gets one reminder immediately (the strong reminder once above
+  `nudgeStrongRatio`), and at `nudgeStrongRatio` every step carries a short one. Otherwise it waits `nudgeEverySteps` admitted steps and at least 2%
+  growth. A declined compaction pauses the strong cadence for the rest of that
+  turn only; turn-start reminders and later turns still fire. Steps are counted
+  across turns, so a turn boundary cannot suppress the next reminder.
 
 ## Development and CI
 

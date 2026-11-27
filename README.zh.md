@@ -71,7 +71,7 @@ profile patch 无法定位嵌在 agent 预设内部的 entry，而每个会话�
 
 工具结果里的 `shadowedTokens` 是被替换区间的**毛价**。摘要会写回表面，所以净减少量是这个价格减去摘要本身。用一段很长的摘要去压几千个计费 token，会话总量可能只动一个百分点；请挑明显大于你所写摘要的区间。
 
-前置步骤提醒（`<span-compaction-reminder>`）在计费上下文同时达到模型窗口的 `nudgeRatio` **和** `nudgeMinTokens` 时，向模型报出读数。如果压缩会打断工作，或用户拒绝了这次请求，模型应先完成任务，再在最终回复前重新检查较早已完成的历史。有值得压缩的区间且用户未要求不要重试时，按正常审批流程再尝试一次。提醒本身不会执行压缩，仍受 `nudgeEverySteps` 与压力增量护栏限流；步骤跨轮次计数，不受每轮 step 编号从 1 开始的影响。
+前置步骤提醒（`<span-compaction-reminder>`）在计费上下文同时达到模型窗口的 `nudgeRatio` **和** `nudgeMinTokens` 时，向模型报出读数。它请模型在**安全停顿**处就地压缩——即下一步不依赖更早已完成历史的位置——而不是一直等到任务结束；模型延期时按 `nudgeEverySteps` 与压力增量护栏再提醒。新一轮开始时若上下文已经超限，会立即提醒一次（已超过 `nudgeStrongRatio` 时直接用强提醒），好让模型先压缩再开始新任务；达到 `nudgeStrongRatio` 后每一步都附带一条简短提醒。提醒本身不会执行压缩。用户拒绝一次压缩审批后，只在当前轮次余下步骤暂停强提醒；下一轮仍会先提醒，压力持续超限时强提醒恢复。步骤跨轮次计数，不受每轮 step 编号从 1 开始的影响。
 
 ## 配置
 
@@ -84,6 +84,7 @@ profile patch 无法定位嵌在 agent 预设内部的 entry，而每个会话�
 | `toolsEnabled` | `true` | 注册 `compact_targets` / `compact` 工具。 |
 | `nudgeEnabled` | `true` | 注入上下文压力提醒。 |
 | `nudgeRatio` | `0.2` | 触发提醒所需的模型窗口占比。 |
+| `nudgeStrongRatio` | `0.25` | 达到窗口该比例后每一步附带简短提醒，新一轮开始也会提醒一次；拒绝压缩只在当前轮次余下步骤暂停。 |
 | `nudgeMinTokens` | `100000` | 低于该绝对 token 底线时不发提醒。 |
 | `nudgeEverySteps` | `10` | 同一 agent 两次提醒之间至少间隔的放行步数。 |
 | `approveCompact` | `true` | 模型执行 `compact` 前请求确认；“完全权限”档仍无需确认。 |
@@ -117,7 +118,7 @@ profile patch 无法定位嵌在 agent 预设内部的 entry，而每个会话�
 
 - 预算限制的是**自动**压缩重放的区间，不是整个请求的上限（系统提示、工具 schema 和保留尾部都在它之外），也不限制手动 `/compact`——后者沿用原生的整段区间选择。
 - 提醒只是给模型的建议。它从不执行压缩，并且在工具被停用时会被抑制，因为没有东西可让模型调用。
-- 提醒需要同时满足窗口的 `nudgeRatio` 和 `nudgeMinTokens`；窗口未知时需要两倍的 `nudgeMinTokens`。它还要等满 `nudgeEverySteps` 个放行步骤，并且自上次提醒以来至少增长 2%。步骤跨轮次计数，所以轮边界不会压掉下一次提醒。
+- 提醒需要同时满足窗口的 `nudgeRatio` 和 `nudgeMinTokens`；窗口未知时需要两倍的 `nudgeMinTokens`。超过该线后，新一轮开始时立即提醒一次（已超过 `nudgeStrongRatio` 时用强提醒），达到 `nudgeStrongRatio` 后每一步都带一条简短提醒；否则等满 `nudgeEverySteps` 个放行步骤且自上次提醒以来至少增长 2%。用户拒绝压缩只暂停当前轮次余下步骤的强提醒，轮首提醒与后续轮次不受影响。步骤跨轮次计数，所以轮边界不会压掉下一次提醒。
 
 ## 开发与 CI
 

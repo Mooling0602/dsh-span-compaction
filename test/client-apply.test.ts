@@ -192,5 +192,5 @@ test('the entry receives its copy and its form controller', () => {
 
 test('the page renders from the official primitives, not a bundled copy', () => {
   assert.equal(typeof client.SpanSettingsPage, 'function')
-  assert.equal(client.FIELDS.length, 9)
+  assert.equal(client.FIELDS.length, 10)
 })

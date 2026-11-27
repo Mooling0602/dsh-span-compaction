@@ -27,6 +27,8 @@ export interface HooksConfig {
   nudgeEnabled?: LiveValue<boolean>
   /** Context window ratio the reminder waits for. */
   nudgeRatio?: LiveValue<number>
+  /** Share of the window from which every step carries a reminder. */
+  nudgeStrongRatio?: LiveValue<number>
   /** Absolute token floor the reminder waits for. */
   nudgeMinTokens?: LiveValue<number>
   /** Admitted steps between two reminders. */
@@ -50,6 +52,7 @@ export function mountHooks(ctx: Context, config: HooksConfig): () => void {
   const stopNudge = registerNudge(ctx, () => ({
     enabled: toolsEnabled() && readLive(config.nudgeEnabled) !== false,
     ratio: readLive(config.nudgeRatio),
+    strongRatio: readLive(config.nudgeStrongRatio),
     minTokens: readLive(config.nudgeMinTokens),
     everySteps: readLive(config.nudgeEverySteps),
   }))

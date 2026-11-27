@@ -36,6 +36,7 @@ test('the page declares one control per setting, flat and in order', () => {
     'toolsEnabled',
     'nudgeEnabled',
     'nudgeRatio',
+    'nudgeStrongRatio',
     'nudgeMinTokens',
     'nudgeEverySteps',
     'approveCompact',
