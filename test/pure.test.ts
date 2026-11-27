@@ -5,8 +5,10 @@
  */
 
 import assert from 'node:assert/strict'
+import { Context } from '@deepseek-ai/cordis'
 import { planSpanCut, spanTotal } from '../src/span.ts'
 import { STOCK_ENGINE, PLUGIN_NAME, rewriteStockRows } from '../src/gate.ts'
+import { runtimeRoot } from '../src/runtime-root.ts'
 
 let passed = 0
 function test(name: string, body: () => void) {
@@ -89,6 +91,25 @@ test('an untouched tree keeps its identity', () => {
   assert.equal(rewriteStockRows(rows), rows)
   const nested = [{ plugins: [{ id: 'other' }] }]
   assert.equal(rewriteStockRows(nested), nested)
+})
+
+const CORDIS_ROOT = (Context as unknown as { root?: symbol }).root
+
+test('runtimeRoot prefers the symbol-addressed root of Cordis 4.2', () => {
+  assert.notEqual(CORDIS_ROOT, undefined)
+  const root = {}
+  const ctx = { [CORDIS_ROOT!]: root }
+  assert.equal(runtimeRoot(ctx as never), root)
+})
+
+test('runtimeRoot falls back to the root property Cordis 4.1 exposes', () => {
+  const root = {}
+  assert.equal(runtimeRoot({ root } as never), root)
+})
+
+test('runtimeRoot returns the context itself when no root is exposed', () => {
+  const ctx = {}
+  assert.equal(runtimeRoot(ctx as never), ctx)
 })
 
 console.log(`\n${passed} checks passed`)

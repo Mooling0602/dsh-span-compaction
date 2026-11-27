@@ -16,7 +16,6 @@
 
 import { BasicCompactionEngine } from '@deepseek-ai/dsh-compaction-basic'
 import type { BasicCompactionConfig } from '@deepseek-ai/dsh-compaction-basic'
-import type { SummarizationInput, SummaryResult } from '@deepseek-ai/dsh-compaction-basic/src/summarizer.ts'
 import { ManualCompactionError, toolPairingBalancedAfter } from '@deepseek-ai/dsh-compaction'
 import type { CompactionResult } from '@deepseek-ai/dsh-compaction'
 import type { Session, SessionSeq } from '@deepseek-ai/dsh-session'
@@ -181,10 +180,10 @@ export default class SpanCompactionEngine extends BasicCompactionEngine {
    * commit, shrink check and checkpoint framing.
    */
   protected override async summarize(
-    input: SummarizationInput,
+    input: Parameters<BasicCompactionEngine['summarize']>[0],
     agent: Agent,
     signal?: AbortSignal,
-  ): Promise<SummaryResult> {
+  ): ReturnType<BasicCompactionEngine['summarize']> {
     const authored = this.modelSummaries.get(agent)
     if (authored !== undefined) {
       this.modelSummaries.delete(agent)

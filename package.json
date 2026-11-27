@@ -1,6 +1,6 @@
 {
   "name": "dsh-span-compaction",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "description": "A DSH compaction engine that keeps one summarization call inside a replay budget, with model-driven compaction tools and a context-pressure reminder.",
   "license": "MIT",
   "type": "module",
@@ -45,7 +45,7 @@
   },
   "engines": {
     "node": ">=24.0.0",
-    "dsh": ">=0.2.3-alpha.2 <0.3.0-0"
+    "dsh": ">=0.2.2-rc.1 <0.2.3-0 || >=0.2.3-alpha.2 <0.3.0-0"
   },
   "keywords": [
     "dsh",
@@ -67,13 +67,13 @@
     "prepublishOnly": "npm run check"
   },
   "peerDependencies": {
-    "@deepseek-ai/cordis": ">=4.0.0 <5.0.0",
-    "@deepseek-ai/dsh-agent": ">=0.2.0-rc.2 <0.3.0",
-    "@deepseek-ai/dsh-client-ui-primitives": ">=0.2.1-rc.3 <0.3.0",
-    "@deepseek-ai/dsh-compaction": ">=0.2.0-rc.2 <0.3.0",
-    "@deepseek-ai/dsh-compaction-basic": ">=0.2.0-rc.2 <0.3.0",
-    "@deepseek-ai/dsh-tools": ">=0.2.0-rc.2 <0.3.0",
-    "@deepseek-ai/schemastery": ">=3.0.0 <5.0.0"
+    "@deepseek-ai/cordis": "^4.1.0 || ^4.2.0-alpha.1",
+    "@deepseek-ai/dsh-agent": ">=0.2.2-rc.1 <0.2.3-0 || >=0.2.3-alpha.2 <0.3.0-0",
+    "@deepseek-ai/dsh-client-ui-primitives": ">=0.2.2-rc.1 <0.2.3-0 || >=0.2.3-alpha.2 <0.3.0-0",
+    "@deepseek-ai/dsh-compaction": ">=0.2.2-rc.1 <0.2.3-0 || >=0.2.3-alpha.2 <0.3.0-0",
+    "@deepseek-ai/dsh-compaction-basic": ">=0.2.2-rc.1 <0.2.3-0 || >=0.2.3-alpha.2 <0.3.0-0",
+    "@deepseek-ai/dsh-tools": ">=0.2.2-rc.1 <0.2.3-0 || >=0.2.3-alpha.2 <0.3.0-0",
+    "@deepseek-ai/schemastery": "^3.19.0 || ^3.20.0-alpha.1"
   },
   "devDependencies": {
     "@deepseek-ai/cordis": "4.2.0-alpha.1",

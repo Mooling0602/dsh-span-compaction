@@ -1,5 +1,6 @@
 /** Small live-config bridge shared by the host entry and isolated preset engines. */
-import { Context } from '@deepseek-ai/cordis'
+import type { Context } from '@deepseek-ai/cordis'
+import { runtimeRoot } from './runtime-root.ts'
 
 export type LiveValue<T> = T | { get(): T }
 
@@ -16,7 +17,7 @@ const budgets = new WeakMap<Context, () => number>()
 
 /** Publish the profile-level budget; presets read it on each compaction pass. */
 export function installLiveBudget(ctx: Context, source: () => number): void {
-  const root = ctx[Context.root] ?? ctx
+  const root = runtimeRoot(ctx)
   ctx.effect(() => {
     budgets.set(root, source)
     return () => {
@@ -27,5 +28,5 @@ export function installLiveBudget(ctx: Context, source: () => number): void {
 
 /** Root budget wins for all Span instances in this runtime, without remounting presets. */
 export function effectiveBudget(ctx: Context, fallback: LiveValue<number>): number {
-  return budgets.get(ctx[Context.root] ?? ctx)?.() ?? readLive(fallback)
+  return budgets.get(runtimeRoot(ctx))?.() ?? readLive(fallback)
 }

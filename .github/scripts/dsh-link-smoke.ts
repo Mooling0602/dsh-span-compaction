@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { realpathSync } from 'node:fs'
+import { readFileSync, realpathSync } from 'node:fs'
 import { createRequire } from 'node:module'
 import { join } from 'node:path'
 import { pathToFileURL } from 'node:url'
@@ -25,7 +25,7 @@ interface ProfileBoot {
   }>
 }
 
-const [mode, entry, workspace = process.cwd()] = process.argv.slice(2)
+const [mode, entry, artifact] = process.argv.slice(2)
 assert.ok(mode === 'prepare' || mode === 'verify', 'Expected prepare or verify mode.')
 assert.ok(entry, 'Expected the installed DSH profile boot module path.')
 assert.ok(process.env.DSH_HOME, 'Expected an isolated DSH_HOME.')
@@ -54,14 +54,21 @@ if (mode === 'prepare') {
     const profileContext = ctx.get<{ dir: string; startedBundles: string[] }>('profileContext')
     assert.ok(profileContext, 'DSH must expose the isolated profile context.')
     assert.ok(profileContext.startedBundles.includes('dsh-span-compaction'), 'DSH must compose the linked bundle.')
-    const linkedPackage = join(profileContext.dir, 'node_modules', 'dsh-span-compaction')
-    assert.equal(realpathSync(linkedPackage), realpathSync(workspace), 'The profile must use the local plugin build.')
+    assert.ok(artifact, 'Expected the npm tarball path.')
+    const manifest = JSON.parse(readFileSync(join(profileContext.dir, 'package.json'), 'utf8')) as {
+      dependencies?: Record<string, string>
+    }
+    const pinned = manifest.dependencies?.['dsh-span-compaction']
+    assert.ok(pinned && pinned.startsWith('file:'), 'The profile must use the local tarball, not a link or registry copy.')
+    assert.equal(realpathSync(pinned.slice(5)), realpathSync(artifact), 'The profile must install the artifact produced by CI.')
 
     assert.equal(ctx.get<object>('compaction')?.constructor.name, 'SpanCompactionEngine', 'Span Compaction must own the host compaction service.')
 
-    const tools = ctx.get<{ get(name: string): { name: string } | undefined }>('tools')
+    const tools = ctx.get<{ get(name: string): { name: string; execute?: unknown } | undefined }>('tools')
     for (const name of ['compact_targets', 'compact']) {
-      assert.equal(tools?.get(name)?.name, name, `The activated plugin must register ${name}.`)
+      const definition = tools?.get(name)
+      assert.equal(definition?.name, name, `The activated plugin must register ${name}.`)
+      assert.equal(typeof definition?.execute, 'function', `${name} must carry an execution handler.`)
     }
     console.log('DSH started with the linked Span Compaction bundle and both model tools.')
     exitCode = 0

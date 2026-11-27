@@ -46,7 +46,7 @@ dsh plugin --profile web remove dsh-span-compaction
 
 必须禁用宿主层的原生引擎，才能由 Span Compaction 提供 `compaction` 服务。`auto: false` 只停用压力和溢出监听器，原生引擎仍会注册该服务。Profile 补丁不能直接修改 agent 预设内的引擎行；这些行由预设 gate 单独替换，并保留各自的 `auto` 设置。
 
-`@deepseek-ai/cordis`、`@deepseek-ai/dsh-compaction`、`@deepseek-ai/dsh-compaction-basic` 和 `@deepseek-ai/schemastery` 是 peer 依赖：运行时从安装作用域解析它们，插件因此跟随宿主版本，而不是固定自己的一份。
+`@deepseek-ai/cordis`、`@deepseek-ai/dsh-compaction`、`@deepseek-ai/dsh-compaction-basic` 和 `@deepseek-ai/schemastery` 是 peer 依赖：运行时从安装作用域解析它们，插件因此跟随宿主版本，而不是固定自己的一份。支持 DSH `0.2.2-rc.1` 及后续 0.2.2 发行版，以及 `0.2.3-alpha.2` 及后续 0.2.x 发行版。插件同时兼容 Cordis 4.1（0.2.2 系列）与 4.2（0.2.3 系列），CI 会启动该范围内每个已发布的运行时。
 
 ## 接管预设引擎
 

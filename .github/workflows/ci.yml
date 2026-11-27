@@ -65,10 +65,12 @@ jobs:
       - uses: pnpm/action-setup@v4
         with:
           version: 12.9.0
-      - name: Install and build the plugin
+      - name: Build and pack the plugin
         run: |
           npm ci --ignore-scripts
           npm run build
+          artifact="$(npm pack --ignore-scripts --pack-destination "$RUNNER_TEMP" --silent)"
+          printf 'PLUGIN_ARTIFACT=%s/%s\n' "$RUNNER_TEMP" "$artifact" >> "$GITHUB_ENV"
       - name: Install DSH runtime
         env:
           DSH_VERSION: ${{ matrix.dsh-version }}
@@ -84,10 +86,10 @@ jobs:
           } >> "$GITHUB_ENV"
       - name: Initialize isolated profile
         run: node .github/scripts/dsh-link-smoke.ts prepare "$DSH_PROFILE_BOOT"
-      - name: Install the local linked plugin
-        run: pnpm --dir "$DSH_RUNTIME" exec dsh plugin --profile ci-smoke add --ignore-scripts "link:${GITHUB_WORKSPACE}"
+      - name: Install the packed plugin
+        run: pnpm --dir "$DSH_RUNTIME" exec dsh plugin --profile ci-smoke add --ignore-scripts "$PLUGIN_ARTIFACT"
       - name: Boot DSH and verify plugin activation
-        run: node .github/scripts/dsh-link-smoke.ts verify "$DSH_PROFILE_BOOT" "$GITHUB_WORKSPACE"
+        run: node .github/scripts/dsh-link-smoke.ts verify "$DSH_PROFILE_BOOT" "$PLUGIN_ARTIFACT"
 
   build:
     needs: verify

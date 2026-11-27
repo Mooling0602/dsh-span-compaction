@@ -71,7 +71,10 @@ The profile-level stock engine must be disabled so Span Compaction can own the `
 `@deepseek-ai/cordis`, `@deepseek-ai/dsh-compaction`,
 `@deepseek-ai/dsh-compaction-basic` and `@deepseek-ai/schemastery` are
 peer dependencies: the runtime resolves them from the installation scope, so the
-plugin tracks the host version instead of pinning its own copy.
+plugin tracks the host version instead of pinning its own copy. Supported hosts are
+DSH `0.2.2-rc.1` and later `0.2.2` releases, plus `0.2.3-alpha.2` and later `0.2.x`
+releases. The plugin works with both Cordis 4.1 (the `0.2.2` line) and 4.2 (the
+`0.2.3` line), and CI boots every published runtime in that range.
 
 ## Taking over preset engines
 

@@ -17,10 +17,11 @@
  * @module dsh-span-compaction/approval
  */
 
-import { Context } from '@deepseek-ai/cordis'
+import type { Context } from '@deepseek-ai/cordis'
 import type { Session } from '@deepseek-ai/dsh-session'
 import type { PreToolDecision } from '@deepseek-ai/dsh-tools'
 import { readLive, type LiveValue } from './live-config.ts'
+import { runtimeRoot } from './runtime-root.ts'
 
 /** Tool that discards retained history and therefore needs explicit consent. */
 export const APPROVAL_TOOL = 'compact'
@@ -105,7 +106,7 @@ function approvalOf(ctx: Context): ApprovalLike | undefined {
  * @param config - resolved plugin configuration.
  */
 export function installToolGate(ctx: Context, config: ApprovalConfig = {}): void {
-  const root: Context = ctx[Context.root] ?? ctx
+  const root: Context = runtimeRoot(ctx)
   if (installed.has(root)) return
   installed.add(root)
   ctx.effect(() => () => {

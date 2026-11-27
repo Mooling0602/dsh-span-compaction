@@ -16,8 +16,8 @@
  * @module dsh-span-compaction/gate
  */
 
-import { Context } from '@deepseek-ai/cordis'
-import type { Fiber } from '@deepseek-ai/cordis'
+import type { Context, Fiber } from '@deepseek-ai/cordis'
+import { runtimeRoot } from './runtime-root.ts'
 
 /** Package name of the stock engine this plugin replaces. */
 export const STOCK_ENGINE = '@deepseek-ai/dsh-compaction-basic'
@@ -172,7 +172,7 @@ function entryId(ctx: Context): string | undefined {
  */
 export function ownsRuntimeHooks(ctx: Context, config: { takeoverPresets?: boolean } = {}): boolean {
   if (config.takeoverPresets === false) return true
-  const root: Context = ctx[Context.root] ?? ctx
+  const root: Context = runtimeRoot(ctx)
   const depth = entryDepth(ctx)
   const previous = installedGates.get(root)
   return previous === undefined || depth <= previous.depth
@@ -190,7 +190,7 @@ export function ownsRuntimeHooks(ctx: Context, config: { takeoverPresets?: boole
  */
 export function installPresetGate(ctx: Context, config: { takeoverPresets?: boolean } = {}): void {
   if (config.takeoverPresets === false) return
-  const root: Context = ctx[Context.root] ?? ctx
+  const root: Context = runtimeRoot(ctx)
   const depth = entryDepth(ctx)
   const previous = installedGates.get(root)
   if (previous !== undefined && (previous.active || depth > previous.depth)) return

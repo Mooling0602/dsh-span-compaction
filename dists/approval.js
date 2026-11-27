@@ -16,8 +16,8 @@
  *
  * @module dsh-span-compaction/approval
  */
-import { Context } from '@deepseek-ai/cordis';
 import { readLive } from "./live-config.js";
+import { runtimeRoot } from "./runtime-root.js";
 /** Tool that discards retained history and therefore needs explicit consent. */
 export const APPROVAL_TOOL = 'compact';
 /** Read-only listing tool that never needs a policy decision. */
@@ -74,7 +74,7 @@ function approvalOf(ctx) {
  * @param config - resolved plugin configuration.
  */
 export function installToolGate(ctx, config = {}) {
-    const root = ctx[Context.root] ?? ctx;
+    const root = runtimeRoot(ctx);
     if (installed.has(root))
         return;
     installed.add(root);

@@ -20,7 +20,8 @@ import type { Session, SessionSeq } from '@deepseek-ai/dsh-session'
 import { deriveEventMessage } from '@deepseek-ai/dsh-session'
 import { toolPairingBalancedAfter, toolPairingBalancedBefore } from '@deepseek-ai/dsh-compaction'
 import type { TokenMeasurement } from '@deepseek-ai/dsh-token-meter'
-import { ToolContextUnavailableError, defineTool } from '@deepseek-ai/dsh-tools'
+import * as toolRuntime from '@deepseek-ai/dsh-tools'
+import { defineTool } from '@deepseek-ai/dsh-tools'
 import type { SpanCompactionEngine } from './engine.ts'
 
 /** Maximum characters of a node's text preview shown to the model. */
@@ -33,6 +34,9 @@ const MAX_RANGES = 5
 const MIN_TARGET_TOKENS = 500
 /** Smallest aggregated range worth offering on its own. */
 const MIN_RANGE_TOKENS = 5_000
+
+// Early 0.2.2 candidates do not export the dedicated context error.
+const ToolContextUnavailableError = toolRuntime.ToolContextUnavailableError ?? Error
 /** One priced, compactable span. */
 interface TargetSpan {
   start: SessionSeq
