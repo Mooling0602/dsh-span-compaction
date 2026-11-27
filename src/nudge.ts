@@ -122,7 +122,7 @@ export function buildStrongReminder(facts: ReminderFacts): string {
     '<span-compaction-reminder>',
     `Context pressure is high: ${pressureReading(facts)}.`,
     'Each step, judge whether a safe cut point exists now. If the next step does not depend on older finished history, compact immediately: call compact_targets, then one compact on the largest finished block with your own summary. Do not wait for the task to end.',
-    '- Never compact the current turn, unanswered questions, pending approvals or anything still needed verbatim.',
+    '- You should compact this session now, and save unanswered questions, pending tasks or anything you should still remember. You can compact after the present action is done, but do not delay too long.',
     '- If the user declined a compaction or asked you not to retry, ignore this and reply.',
     '</span-compaction-reminder>',
   ].join('\n')

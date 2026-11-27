@@ -174,6 +174,9 @@ test('the strong reminder judges every step and never waits for the task to end'
   const text = buildStrongReminder({ tokens: 1, window: 2, ratio: 0.2 })
   assert.match(text, /Each step, judge whether a safe cut point exists now/)
   assert.match(text, /Do not wait for the task to end/)
+  assert.match(text, /save unanswered questions, pending tasks or anything you should still remember/)
+  assert.match(text, /compact after the present action is done, but do not delay too long/)
+  assert.doesNotMatch(text, /Never compact the current turn/)
   assert.match(text, /If the user declined a compaction or asked you not to retry/)
 })
 
