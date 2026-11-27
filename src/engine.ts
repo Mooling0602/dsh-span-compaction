@@ -17,7 +17,7 @@
 import { BasicCompactionEngine } from '@deepseek-ai/dsh-compaction-basic'
 import type { BasicCompactionConfig } from '@deepseek-ai/dsh-compaction-basic'
 import type { SummarizationInput, SummaryResult } from '@deepseek-ai/dsh-compaction-basic/src/summarizer.ts'
-import { toolPairingBalancedAfter } from '@deepseek-ai/dsh-compaction'
+import { ManualCompactionError, toolPairingBalancedAfter } from '@deepseek-ai/dsh-compaction'
 import type { CompactionResult } from '@deepseek-ai/dsh-compaction'
 import type { Session, SessionSeq } from '@deepseek-ai/dsh-session'
 import type { Agent } from '@deepseek-ai/dsh-agent'
@@ -101,9 +101,9 @@ export default class SpanCompactionEngine extends BasicCompactionEngine {
     maxOverflowRetries,
     modelPolicies: z.array(modelPolicy),
     auto: z.boolean(),
-    spanBudgetTokens: z.number().step(1).min(1).default(DEFAULT_SPAN_BUDGET_TOKENS)
-      .description('Replay span budget (tokens). Applies to automatic region compaction, not the whole request or manual /compact.')
-      .i18n({ zh: '历史分段预算（token）：适用于自动区域压缩，不是整个请求上限，也不限制手动 /compact。' }).volatile(),
+    spanBudgetTokens: z.number().step(1).min(0).default(DEFAULT_SPAN_BUDGET_TOKENS)
+      .description('Automatic compaction replay budget (tokens). Zero means unlimited on the first attempt. If zero or above the default, retry failures once with the default. Does not affect manual /compact.')
+      .i18n({ zh: '自动压缩重放预算（token）：0 表示首次尝试不限制重放。预算为 0 或超过默认值时，失败后用默认预算重试一次。不影响手动 /compact。' }).volatile(),
     takeoverPresets: z.boolean(),
     toolsEnabled: z.boolean().default(true)
       .description('Model compaction tools. Turning these off does not disable automatic compaction or /compact.')
@@ -122,7 +122,7 @@ export default class SpanCompactionEngine extends BasicCompactionEngine {
       .i18n({ zh: '提醒至少间隔的步数；上下文还须增长至少 2%。' }).volatile(),
     approveCompact: z.boolean().default(true)
       .description('Ask for consent before `compact` runs: the call replaces retained history. Full access keeps its no-prompt contract.')
-      .i18n({ zh: '模型调用 compact 前请求用户确认：该调用会用摘要替换历史；“完全权限”保持不弹窗的约定。' }).volatile(),
+      .i18n({ zh: '模型调用 compact 前请求用户确认：该调用会用摘要替换历史；“完全权限”档仍无需确认。' }).volatile(),
     exemptTargets: z.boolean().default(true)
       .description('Let `compact_targets` bypass downstream pre-execute policy, including Auto review. It only lists candidates.')
       .i18n({ zh: 'compact_targets 跳过下游预执行策略（含自动审查）：它只列出候选范围。' }).volatile(),
@@ -236,7 +236,8 @@ export default class SpanCompactionEngine extends BasicCompactionEngine {
    *
    * Narrowing here (rather than replacing the range selection) keeps the stock
    * retention policy, stability checks, pricing and commit path intact: every
-   * pass still commits a normal durable compaction.
+   * pass still commits a normal durable compaction. A failed pass with an
+   * unlimited or above-default budget retries once with the default budget.
    *
    * @param start - inclusive first surface-node seq of the selected range.
    * @param end - inclusive last surface-node seq of the selected range.
@@ -245,13 +246,36 @@ export default class SpanCompactionEngine extends BasicCompactionEngine {
    * @returns the successful durable compaction result.
    */
   override async compactRegion(start: SessionSeq, end: SessionSeq, agent: Agent, signal?: AbortSignal): Promise<CompactionResult> {
-    const narrowed = this.narrowRange(agent.session, start, end)
+    const session = agent.session
+    const budget = effectiveBudget(this.ctx, this.spanBudgetTokens)
+    const narrowed = this.narrowRange(session, start, end, budget)
     if (narrowed !== end) {
       this.ctx.logger.info(
-        `span compaction: replay budget ${effectiveBudget(this.ctx, this.spanBudgetTokens)} narrows seq ${start}-${end} to ${start}-${narrowed}`,
+        `span compaction: replay budget ${budget} narrows seq ${start}-${end} to ${start}-${narrowed}`,
       )
     }
-    return super.compactRegion(start, narrowed, agent, signal)
+    const generation = session.surface.replaceGeneration
+    try {
+      return await super.compactRegion(start, narrowed, agent, signal)
+    } catch (error) {
+      // Never retry after a replacement, even if recording its close failed.
+      if ((budget !== 0 && budget <= DEFAULT_SPAN_BUDGET_TOKENS)
+        || signal?.aborted || session.surface.replaceGeneration !== generation
+        || (error instanceof ManualCompactionError && error.code === 'busy')) throw error
+
+      const retryEnd = this.narrowRange(session, start, end, DEFAULT_SPAN_BUDGET_TOKENS)
+      this.ctx.logger.info(
+        `span compaction: retrying with default replay budget ${DEFAULT_SPAN_BUDGET_TOKENS} (seq ${start}-${retryEnd})`,
+      )
+      try {
+        return await super.compactRegion(start, retryEnd, agent, signal)
+      } catch (retryError) {
+        // A failed close can leave the native lock held without any replacement.
+        // Preserve that original failure rather than reporting a new busy error.
+        if (retryError instanceof ManualCompactionError && retryError.code === 'busy') throw error
+        throw retryError
+      }
+    }
   }
 
   /**
@@ -259,9 +283,11 @@ export default class SpanCompactionEngine extends BasicCompactionEngine {
    * @param session - session owning the surface positions.
    * @param start - inclusive first surface-node seq of the selected range.
    * @param end - inclusive last surface-node seq of the selected range.
-   * @returns the seq to compact up to; `end` when the whole range fits.
+   * @param budget - explicit per-attempt limit; callers normally use the live setting.
+   * @returns the seq to compact up to; `end` when the budget is disabled or the whole range fits.
    */
-  narrowRange(session: Session, start: SessionSeq, end: SessionSeq): SessionSeq {
+  narrowRange(session: Session, start: SessionSeq, end: SessionSeq, budget = effectiveBudget(this.ctx, this.spanBudgetTokens)): SessionSeq {
+    if (budget === 0) return end
     const { nodes } = this.ctx.tokenMeter.measure(session)
     const startIndex = nodes.findIndex(node => node.seq === start)
     const endIndex = nodes.findIndex(node => node.seq === end)
@@ -269,7 +295,7 @@ export default class SpanCompactionEngine extends BasicCompactionEngine {
     const range = nodes.slice(startIndex, endIndex + 1)
     const cut = planSpanCut(
       range.map(node => node.tokens ?? 0),
-      effectiveBudget(this.ctx, this.spanBudgetTokens),
+      budget,
       index => toolPairingBalancedAfter(session, range[index]!.seq),
     )
     return cut === null ? end : range[cut]!.seq

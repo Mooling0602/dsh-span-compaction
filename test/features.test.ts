@@ -157,16 +157,26 @@ test('the reminder says the target list is not the limit of what may be compacte
   assert.match(text, /model window unknown/)
 })
 
-test('the reminder demands compaction now instead of offering it', () => {
+test('the reminder prefers safe pauses without demanding that work stop', () => {
   const text = buildReminder({ tokens: 1, window: 2, ratio: 0.2 })
-  assert.match(text, /Compact now, in this turn/)
-  assert.match(text, /Do not wait for this reminder/)
-  assert.doesNotMatch(text, /Compression is optional/)
+  assert.match(text, /Compact at the next safe pause/)
+  assert.match(text, /would interrupt ongoing work or the user declines this compaction request, finish the task first/)
+  assert.match(text, /Do not ask again mid-task/)
+  assert.doesNotMatch(text, /Compact now, in this turn/)
+})
+
+test('a deferred reminder asks for one worthwhile attempt at completion, with approval', () => {
+  const text = buildReminder({ tokens: 1, window: 2, ratio: 0.2 })
+  assert.match(text, /recheck compact_targets when the task is done, before sending your final reply/)
+  assert.match(text, /one attempt with normal approval if there is still a worthwhile range in older, finished history/)
+  assert.match(text, /Skip it if the user asked you not to retry/)
+  assert.match(text, /if declined again, send the final reply without asking again/)
 })
 
 test('the reminder names what may not be compressed', () => {
   const text = buildReminder({ tokens: 1, window: 2, ratio: 0.2 })
   assert.match(text, /current task, unanswered user questions, pending decisions/)
+  assert.match(text, /The current turn is not a candidate even at task completion/)
   assert.match(text, /already compressed/)
 })
 

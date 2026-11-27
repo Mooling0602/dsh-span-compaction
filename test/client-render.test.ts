@@ -8,17 +8,28 @@
  * the booleans render as switches, and a namespace the Host does not serve says
  * so instead of drawing controls nothing would accept.
  *
- * Run with `node test/client-render.test.mjs`.
+ * Run with `node --test test/client-render.test.ts`.
  */
 import assert from 'node:assert/strict'
 import { createRequire } from 'node:module'
+import { test } from 'node:test'
+import { createElement as h } from 'react'
+import type { ChangeEvent } from 'react'
+import { renderToStaticMarkup } from 'react-dom/server'
+import type { SettingsFieldSpec, SettingsFormShell } from '@deepseek-ai/dsh-client-ui-primitives'
+import type { Translate } from '../src/client/contracts.ts'
+import type { SpanCardState, SpanFieldStates } from '../src/client/settings-controller.ts'
+import type { SpanSettingsProps } from '../src/client/settings-page.tsx'
+
+type ClientExports = Pick<typeof import('../src/client/index.ts'), 'SpanSettingsPage' | 'zh'>
+type ModuleDefinition = { id: string; factory: (resolve: (id: string) => unknown) => ClientExports }
+type Primitives = typeof import('@deepseek-ai/dsh-client-ui-primitives')
 
 const require = createRequire(import.meta.url)
-const { createElement: h } = require('react')
-const { renderToStaticMarkup } = require('react-dom/server')
+const fieldSpec = (field: string): SettingsFieldSpec => ({ field, format: () => '', parse: () => undefined })
 
 /** The prop contract of the shared primitives, rendered as plain markup. */
-const primitives = {
+const controls = {
   SettingsForm: ({ labels, state, onSave, children }) => {
     if (!state.available) return h('p', { role: 'status' }, labels.unavailable)
     return h('div', null,
@@ -34,52 +45,35 @@ const primitives = {
     h('input', { id: props.id, value: props.text, readOnly: true, disabled: props.disabled }),
     h('p', null, props.invalid ? props.invalidLabel : props.hint),
     props.overridden ? h('button', { type: 'button', 'data-reset': props.id, onClick: props.onReset }, props.resetLabel) : null),
-  Switch: ({ checked, label, disabled, onChange }) => h('input', { type: 'checkbox', 'aria-label': label, checked, readOnly: true, disabled, onChange }),
-  settingsNumberField: field => ({ field, format: () => '', parse: () => undefined }),
-  settingsTextField: field => ({ field, format: () => '', parse: () => undefined }),
-  SettingsFormModel: class {
-    bind(project) {
-      return { getSnapshot: () => project(), subscribe: () => () => {}, set: () => {} }
-    }
-    field() {
-      return { text: '', overridden: false, invalid: false }
-    }
-    shell() {
-      return { available: false, writable: false, dirty: false, invalid: false, saving: false, failed: false }
-    }
-    actions() {
-      return { edit: () => {}, resetField: () => {}, save: () => {}, discard: () => {} }
-    }
-    dispose() {}
-  },
+  Switch: ({ checked, label, disabled, onChange }) => h('input', {
+    type: 'checkbox', 'aria-label': label, checked, readOnly: true, disabled,
+    onChange: (event: ChangeEvent<HTMLInputElement>) => onChange(event.currentTarget.checked),
+  }),
+} satisfies Pick<Primitives, 'SettingsForm' | 'SettingsValueField' | 'Switch'>
+
+const primitives = {
+  ...controls,
+  settingsNumberField: fieldSpec,
+  settingsTextField: fieldSpec,
 }
 
-let captured
-globalThis.window = { __ModuleLoader__: { load: def => { captured = def } } }
-await import('../dist/client.js')
-const exports = captured.factory(id => {
+const loader: { definition?: ModuleDefinition; load(definition: ModuleDefinition): void } = {
+  load(definition) { this.definition = definition },
+}
+Object.defineProperty(globalThis, 'window', { value: { __ModuleLoader__: loader }, configurable: true })
+await import(new URL('../dist/client.js', import.meta.url).href)
+assert.ok(loader.definition, 'bundle did not register a factory')
+const client = loader.definition.factory(id => {
   if (id === 'react') return require('react')
   if (id === 'react/jsx-runtime') return require('react/jsx-runtime')
   if (id === '@deepseek-ai/dsh-client-ui-primitives') return primitives
   throw new Error(`unexpected require ${id}`)
 })
 
-let passed = 0
-function test(name, body) {
-  try {
-    body()
-    passed += 1
-    console.log(`ok   ${name}`)
-  } catch (error) {
-    console.error(`FAIL ${name}\n${error.stack}`)
-    process.exitCode = 1
-  }
-}
-
-const t = key => exports.zh[key] ?? key
+const t: Translate = key => client.zh[key] ?? key
 
 /** Store values a saved page reports. */
-const FIELDS = {
+const FIELDS: SpanFieldStates = {
   spanBudgetTokens: { text: '160000', overridden: false, invalid: false },
   thresholdRatio: { text: '0.8', overridden: false, invalid: false },
   toolsEnabled: { text: 'on', overridden: false, invalid: false },
@@ -91,13 +85,11 @@ const FIELDS = {
   exemptTargets: { text: 'on', overridden: false, invalid: false },
 }
 
-/**
- * Props the renderer binds for this page, over fixed state.
- * @param over - shell overrides and field overrides.
- * @returns the props and the recorded actions.
- */
-function propsFor(over = {}) {
-  const state = {
+type Overrides = { shell?: Partial<SettingsFormShell>; fields?: Partial<SpanFieldStates> }
+
+/** Props the renderer binds for this page, over fixed state. */
+function propsFor(over: Overrides = {}): SpanSettingsProps {
+  const state: SpanCardState = {
     available: true,
     writable: true,
     dirty: false,
@@ -108,25 +100,21 @@ function propsFor(over = {}) {
     ...over.fields,
     ...over.shell,
   }
-  const calls = []
   return {
-    calls,
-    props: {
-      t,
-      edit: (field, text) => calls.push(`edit:${field}:${text}`),
-      resetField: field => calls.push(`reset:${field}`),
-      save: () => calls.push('save'),
-      discard: () => calls.push('discard'),
-      hooks: {},
-      useSpanCard: select => select(state),
-    },
+    t,
+    edit: () => {},
+    resetField: () => {},
+    save: () => {},
+    discard: () => {},
+    hooks: { spanCard: { getSnapshot: () => state, subscribe: () => () => {}, set: () => {}, update: () => {} } },
+    useSpanCard: select => select(state),
   }
 }
 
-const render = overrides => renderToStaticMarkup(h(exports.SpanSettingsPage, propsFor(overrides).props))
+const render = (overrides?: Overrides) => renderToStaticMarkup(h(client.SpanSettingsPage, propsFor(overrides)))
 
 test('the summary view renders the one-line description', () => {
-  const markup = renderToStaticMarkup(h(exports.SpanSettingsPage, { ...propsFor().props, view: 'summary' }))
+  const markup = renderToStaticMarkup(h(client.SpanSettingsPage, { ...propsFor(), view: 'summary' }))
   assert.match(markup, /重放预算、模型压缩工具与上下文压力提醒/)
 })
 
@@ -192,9 +180,18 @@ test('a read-only deployment still draws the fields and says why', () => {
   assert.match(markup, /type="checkbox"/)
 })
 
-test('an invalid draft shows the invalid copy', () => {
-  const markup = render({ fields: { spanBudgetTokens: { text: '0', overridden: true, invalid: true } } })
-  assert.match(markup, /请输入数字；留空表示使用默认值。/)
+test('the approval hint ends with the exact Full access exemption', () => {
+  assert.match(render(), /“完全权限”档仍无需确认。<\/p>/)
 })
 
-console.log(`\n${passed} checks passed`)
+test('a zero budget explains unlimited replay and one retry with the default', () => {
+  const markup = render({ fields: { spanBudgetTokens: { text: '0', overridden: true, invalid: false } } })
+  assert.match(markup, /value="0"/)
+  assert.match(markup, /设为 0 时，自动压缩不限制重放长度/)
+  assert.match(markup, /失败后用默认预算重试一次/)
+})
+
+test('an invalid draft shows the invalid copy', () => {
+  const markup = render({ fields: { spanBudgetTokens: { text: 'abc', overridden: true, invalid: true } } })
+  assert.match(markup, /请输入数字；留空表示使用默认值。/)
+})

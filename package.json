@@ -60,9 +60,11 @@
     "build": "tsc -p tsconfig.json && node scripts/build-client.mjs",
     "build:client": "node scripts/build-client.mjs",
     "typecheck": "tsc --noEmit -p tsconfig.json",
+    "typecheck:test": "tsc -p tsconfig.test.json",
     "test": "node test/pure.test.ts && node test/approval.test.ts && node test/engine.test.ts && node test/features.test.ts && node test/settings.test.ts",
-    "test:client": "node test/client-apply.test.mjs && node test/client-render.test.mjs",
-    "check": "npm run build && npm run test && npm run test:client",
+    "test:client": "node --test test/client-apply.test.ts test/client-render.test.ts",
+    "test:smoke": "node --test test/dists-smoke.test.ts",
+    "check": "npm run build && npm run typecheck:test && npm run test && npm run test:client && npm run test:smoke",
     "prepublishOnly": "npm run check"
   },
   "peerDependencies": {

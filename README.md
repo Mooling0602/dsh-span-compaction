@@ -13,10 +13,7 @@ uncompacted history, so any lane that refuses oversized side requests rejects it
 before forwarding — the pass fails, the retry loop fires again one minute later
 with an even longer history, and the conversation never gets compacted.
 
-This plugin narrows every pass to the largest balanced prefix of the selected
-span whose route-priced tokens fit `spanBudgetTokens`. Each pass commits a normal
-durable compaction, so repeated passes converge, and no single summarization call
-can outgrow the budget no matter how long the session runs.
+By default, this plugin narrows each automatic pass to a balanced prefix of the selected span based on the `spanBudgetTokens` replay budget. Each pass commits a normal durable compaction, so repeated passes converge. Set the budget to `0` to use the full span selected by the stock engine.
 
 It also exposes two model-facing tools (`compact_targets`, `compact`) so the model
 can compact a chosen span with a summary it writes itself — no auxiliary
@@ -131,12 +128,7 @@ minus the summary itself. Compacting a few thousand priced tokens with a long
 summary can move the session total by only a percent; pick a span that is much
 larger than the summary you can write for it.
 
-A pre-step nudge (`<span-compaction-reminder>`) tells the model when priced
-context crosses `nudgeRatio` of the model window **and** `nudgeMinTokens`, quoting
-that reading so the decision is made on numbers. It never compacts anything itself and is rate-limited by `nudgeEverySteps` plus a
-pressure-delta guard so it cannot spiral into repeated reminders. Steps are
-counted across turns: the event's own step number restarts at 1 on every turn,
-and using it directly would suppress every reminder that follows a turn boundary.
+A pre-step nudge (`<span-compaction-reminder>`) quotes the context reading once priced context crosses `nudgeRatio` of the model window **and** `nudgeMinTokens`. If compaction would interrupt work or the user declines that attempt, it tells the model to finish the task and recheck older eligible history before the final reply. The model can try once at that point through the normal approval flow, unless the user asked it not to retry. The nudge never runs compaction itself and is rate-limited by `nudgeEverySteps` plus a pressure-delta guard. Steps count across turns even though each turn's step numbering restarts at 1.
 
 ## Configuration
 
@@ -150,7 +142,7 @@ revision-fenced mutation. Leaving the page drops whatever was not saved.
 
 | Key | Default | Meaning |
 | --- | --- | --- |
-| `spanBudgetTokens` | `160000` | Maximum route-priced tokens one automatic summarization pass may replay. |
+| `spanBudgetTokens` | `160000` | Replay budget in route-priced tokens per automatic pass. Set `0` to disable this budget. |
 | `thresholdRatio` | `0.8` | Share of the routed model's context window at which a step-boundary automatic compaction runs. |
 | `toolsEnabled` | `true` | Register the `compact_targets` / `compact` tools. |
 | `nudgeEnabled` | `true` | Inject the context-pressure reminder. |
@@ -194,10 +186,7 @@ Every stock engine key still applies and can be set in `cordis.patch.yml`:
     thresholdRatio: 0.7
 ```
 
-`spanBudgetTokens` is deliberately independent of the model window: it bounds the
-payload a summarization request carries, not the capacity of the model that reads
-it. Keep it below any proxy-side per-request ceiling, and below the smaller of
-the models used across routes when they differ.
+Leaving `spanBudgetTokens` unset uses the default of `160000`. Setting it to `0` removes the replay limit on the first attempt. If the budget is `0` or above the default and automatic compaction fails without cancellation or a history replacement, the plugin retries once at the default without changing the saved setting. Budgets from `1` through `160000` do not get this extra retry. Model and proxy limits still apply; automatic thresholds, retention, manual `/compact`, and model-authored `compact` are unchanged.
 
 ### What a saved setting changes
 

@@ -38,11 +38,13 @@ export function buildReminder(facts) {
     return [
         '<span-compaction-reminder>',
         `Context pressure: ${reading}. Every later request pays this again.`,
-        'Compact now, in this turn, before continuing: you write the summary, compact() replaces the range with it, and no auxiliary summarization request is sent.',
+        'Compact at the next safe pause: you write the summary, compact() replaces the range with it, and no auxiliary summarization request is sent.',
+        '- If compaction would interrupt ongoing work or the user declines this compaction request, finish the task first. Do not ask again mid-task.',
+        '- If deferred, recheck compact_targets when the task is done, before sending your final reply. Make one attempt with normal approval if there is still a worthwhile range in older, finished history. Skip it if the user asked you not to retry; if declined again, send the final reply without asking again.',
         '- compact_targets gives boundary seqs with token counts; it lists single candidate nodes, not the limit of what may be compacted.',
         '- Prefer ONE large, contiguous, completed block over many small pieces. Net saving is roughly shadowedTokens minus your summary; a span smaller than its summary is a loss.',
-        '- Keep out: the current task, unanswered user questions, pending decisions, and anything you still need verbatim — carry those facts in the summary instead. Checkpoints and re-injected reminders are already compressed.',
-        '- Do not wait for this reminder: fold each finished block as soon as it is done, so priced history stays near 10% of the window.',
+        '- Keep out: the current task, unanswered user questions, pending decisions, and anything you still need verbatim. The current turn is not a candidate even at task completion. Checkpoints and re-injected reminders are already compressed.',
+        '- Do not wait for a new reminder: check finished history at safe milestones so priced history stays near 10% of the window.',
         '</span-compaction-reminder>',
     ].join('\n');
 }
@@ -165,7 +167,7 @@ export function registerNudge(ctx, raw = {}) {
             source: {
                 kind: 'dsh-span-compaction',
                 form: 'nudge',
-                summary: 'context pressure: model may compact a chosen range',
+                summary: 'context pressure: compact at a safe pause or revisit before the final reply',
             },
         });
         return { ...decision, messages: [...decision.messages, reminder] };

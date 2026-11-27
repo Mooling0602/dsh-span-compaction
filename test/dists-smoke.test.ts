@@ -7,23 +7,13 @@
  * page registered on the wrong slot — each of those ships a plugin that looks
  * fine in the repository and does nothing on the machine.
  *
- * Run with `node test/dists-smoke.test.ts`.
+ * Run with `npm run test:smoke` after building.
  */
 
 import assert from 'node:assert/strict'
 import { existsSync, readFileSync } from 'node:fs'
-
-let passed = 0
-function test(name: string, body: () => void) {
-  try {
-    body()
-    passed += 1
-    console.log(`ok   ${name}`)
-  } catch (error) {
-    console.error(`FAIL ${name}\n${(error as Error).stack}`)
-    process.exitCode = 1
-  }
-}
+import { test } from 'node:test'
+import { localFiles, languageChain, readPackageDocument } from '@deepseek-ai/dsh-plugin-detail'
 
 /** The configuration keys the settings page edits. */
 const FLAT_KEYS = ['spanBudgetTokens', 'thresholdRatio', 'toolsEnabled', 'nudgeEnabled', 'nudgeRatio', 'nudgeMinTokens', 'nudgeEverySteps', 'approveCompact', 'exemptTargets']
@@ -31,8 +21,9 @@ const FLAT_KEYS = ['spanBudgetTokens', 'thresholdRatio', 'toolsEnabled', 'nudgeE
 assert.ok(existsSync('dists/index.js'), 'the Host half is not built: run npm run build')
 assert.ok(existsSync('dist/client.js'), 'the browser half is not built: run npm run build')
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-const entry = (await import('../dists/index.js')).default as any
+type ConfigField = { meta?: { volatile?: boolean, description?: Record<string, string> } }
+const { default: entry }: typeof import('../src/index.ts') = await import(new URL('../dists/index.js', import.meta.url).href)
+const config = entry.Config as { dict: Record<string, ConfigField> }
 const clientBundle = readFileSync('dist/client.js', 'utf8')
 
 test('the built entry is a Cordis plugin with the services the engine needs', () => {
@@ -41,13 +32,13 @@ test('the built entry is a Cordis plugin with the services the engine needs', ()
 })
 
 test('the built schema serves the flat keys the page edits', () => {
-  const dict = entry.Config.dict as Record<string, { meta?: { volatile?: boolean, description?: Record<string, string> } }>
+  const dict = config.dict
   for (const key of FLAT_KEYS) assert.ok(key in dict, `schema has no ${key}`)
   assert.ok(!('tools' in dict) && !('nudge' in dict), 'the nested keys are back')
 })
 
 test('every page field is volatile and carries Chinese copy', () => {
-  const dict = entry.Config.dict as Record<string, { meta?: { volatile?: boolean, description?: Record<string, string> } }>
+  const dict = config.dict
   for (const key of FLAT_KEYS) {
     assert.equal(dict[key]?.meta?.volatile, true, `${key} is not volatile`)
     assert.ok((dict[key]?.meta?.description?.zh ?? '').length > 0, `${key} has no zh description`)
@@ -55,7 +46,7 @@ test('every page field is volatile and carries Chinese copy', () => {
 })
 
 test('the tools and the reminder are part of the built hooks module', async () => {
-  const hooks = await import('../dists/hooks.js') as Record<string, unknown>
+  const hooks: typeof import('../src/hooks.ts') = await import(new URL('../dists/hooks.js', import.meta.url).href)
   assert.equal(typeof hooks.mountHooks, 'function')
 })
 
@@ -84,19 +75,14 @@ test('the listing copy exists in both languages', () => {
   }
 })
 
-test('the plugin page resolves its document through the real DSH resolver', async () => {
+test('the plugin page resolves its document through the real DSH resolver', async ({ signal }) => {
   // `dsh-plugin-detail` is the package the Plugins page actually uses: it reads
   // `meta.detail` along the language chain, requires the named Markdown file to
   // exist inside the package, and only falls back to the README when no locale
   // declares one. Running it here means a bad path fails the build instead of
   // the plugin page.
-  const detail = await import('@deepseek-ai/dsh-plugin-detail') as {
-    localFiles: (root: string) => unknown
-    languageChain: (language: string) => string[]
-    readPackageDocument: (files: unknown, dir: string, languages: string[], maxBytes: number) => Promise<{ origin: string, path: string, markdown: string } | undefined>
-  }
-  const files = detail.localFiles(process.cwd())
-  const read = async (language: string) => await detail.readPackageDocument(files, '', detail.languageChain(language), 1 << 20)
+  const files = localFiles(process.cwd(), 'test')
+  const read = (language: string) => readPackageDocument(files, '', languageChain(language), 1 << 20, signal)
 
   const chinese = await read('zh-CN')
   assert.equal(chinese?.origin, 'locale')
@@ -117,5 +103,3 @@ test('the shipped documents are not placeholders', () => {
     assert.ok(readFileSync(path, 'utf8').trim().length > 200, `${path} is too short to describe the plugin`)
   }
 })
-
-console.log(`\n${passed} checks passed`)
