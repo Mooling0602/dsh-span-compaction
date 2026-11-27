@@ -4,14 +4,8 @@
 - insert:
     - id: span-compaction
       name: dsh-span-compaction
-# Disable the HOST-PLANE compaction-basic row. Without this the profile-level
-# engine stays `auto: true` and registers its own pressure / overflow listeners on
-# the root context, compacting the same session a second time with the stock
-# unbounded replay span — that summary request carries the whole history and is
-# rejected as too large. Preset rows are outside a patch's reach; the gate renames
-# them to this engine instead, which keeps their `auto` and applies the bounded
-# span. A patch replaces the row's whole config (no deep merge), so other keys on
-# this row fall back to their defaults — the same trade-off billion-context makes.
+# `auto: false` stops listeners but still registers the compaction service.
+# Disable the host row so Span Compaction can own that service. Preset rows
+# are replaced separately by the preset gate.
 - id: compaction-basic
-  config:
-    auto: false
+  disabled: true

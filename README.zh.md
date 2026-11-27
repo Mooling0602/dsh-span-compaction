@@ -39,13 +39,12 @@ dsh plugin --profile web remove dsh-span-compaction
     - id: span-compaction
       name: dsh-span-compaction
 - id: compaction-basic
-  config:
-    auto: false
+  disabled: true
 ```
 
 插件挂载的一切都刻意放在这一行上：一个包只能作为一个 client module 行的来源，而 `client-modules` 会拒绝被两个活跃行同时解析的包，所以再加一行 hooks 会悄悄让这个 bundle 失去它的配置页。
 
-停用宿主平面的那一行是必须的。否则 `compaction-basic` 保持 `auto: true`，在根 context 上注册自己的压力 / 溢出监听器。这些监听器会用原生无界重放区间对同一个会话再压一次，于是摘要请求仍可能携带整段历史而被判超长。预设行嵌在 agent 预设内部，profile patch 无法定位；下面的 gate 会把它们重命名到本引擎，这样既保留它们各自的 `auto` 设置，又用上有界区间。patch 替换一行的整份配置而不是合并键，所以宿主平面行上的其他设置会回到默认值——这也是 billion-context 停用该行时付出的同样代价。
+必须禁用宿主层的原生引擎，才能由 Span Compaction 提供 `compaction` 服务。`auto: false` 只停用压力和溢出监听器，原生引擎仍会注册该服务。Profile 补丁不能直接修改 agent 预设内的引擎行；这些行由预设 gate 单独替换，并保留各自的 `auto` 设置。
 
 `@deepseek-ai/cordis`、`@deepseek-ai/dsh-compaction`、`@deepseek-ai/dsh-compaction-basic` 和 `@deepseek-ai/schemastery` 是 peer 依赖：运行时从安装作用域解析它们，插件因此跟随宿主版本，而不是固定自己的一份。
 
@@ -119,3 +118,14 @@ profile patch 无法定位嵌在 agent 预设内部的 entry，而每个会话�
 - 预算限制的是**自动**压缩重放的区间，不是整个请求的上限（系统提示、工具 schema 和保留尾部都在它之外），也不限制手动 `/compact`——后者沿用原生的整段区间选择。
 - 提醒只是给模型的建议。它从不执行压缩，并且在工具被停用时会被抑制，因为没有东西可让模型调用。
 - 提醒需要同时满足窗口的 `nudgeRatio` 和 `nudgeMinTokens`；窗口未知时需要两倍的 `nudgeMinTokens`。它还要等满 `nudgeEverySteps` 个放行步骤，并且自上次提醒以来至少增长 2%。步骤跨轮次计数，所以轮边界不会压掉下一次提醒。
+
+## 开发与 CI
+
+使用 Node.js 24.22.3 在本地复现 CI 的测试阶段：
+
+```sh
+npm ci --ignore-scripts
+npm run check
+```
+
+[CI 工作流](.github/workflows/ci.yml) 在推送到 `main`、打开或更新拉取请求以及手动触发时运行。它先构建宿主与客户端、检查类型并运行测试，再根据 `engines.dsh` 为每个匹配的已发布 DSH 版本启动无 Web 服务的临时 Profile，链接本地插件，验证插件激活和工具注册。全部通过后只在工作流内归档 npm 压缩包，不向 npm 发布，也不创建 Release。

@@ -26,9 +26,6 @@
     "LICENSE"
   ],
   "dsh": {
-    "engines": {
-      "dsh": ">=0.2.3-alpha.2"
-    },
     "bundle": {
       "patch": "./cordis.patch.yml"
     },
@@ -47,7 +44,8 @@
     }
   },
   "engines": {
-    "node": ">=24.0.0"
+    "node": ">=24.0.0",
+    "dsh": ">=0.2.3-alpha.2 <0.3.0-0"
   },
   "keywords": [
     "dsh",
@@ -64,7 +62,8 @@
     "test": "node test/pure.test.ts && node test/approval.test.ts && node test/engine.test.ts && node test/features.test.ts && node test/settings.test.ts",
     "test:client": "node --test test/client-apply.test.ts test/client-render.test.ts",
     "test:smoke": "node --test test/dists-smoke.test.ts",
-    "check": "npm run build && npm run typecheck:test && npm run test && npm run test:client && npm run test:smoke",
+    "test:ci": "node --test test/ci-discovery.test.ts",
+    "check": "npm run build && npm run typecheck:test && npm run test && npm run test:client && npm run test:smoke && npm run test:ci",
     "prepublishOnly": "npm run check"
   },
   "peerDependencies": {
@@ -99,9 +98,11 @@
     "@types/node": "^22.20.5",
     "@types/react": "^19.3.3",
     "@types/react-dom": "^19.3.0",
+    "@types/semver": "^7.8.0",
     "esbuild": "^0.28.2",
     "react": "^19.3.1",
     "react-dom": "^19.3.1",
+    "semver": "^7.7.3",
     "typescript": "^5.9.3"
   }
 }

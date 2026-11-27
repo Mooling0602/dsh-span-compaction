@@ -58,8 +58,7 @@ profile-level stock engine:
     - id: span-compaction
       name: dsh-span-compaction
 - id: compaction-basic
-  config:
-    auto: false
+  disabled: true
 ```
 
 Everything the plugin mounts lives on that single row on purpose: a package may be
@@ -67,16 +66,7 @@ the source of only one client module row, and `client-modules` refuses a package
 that two active rows resolve to, so a second hooks row would silently cost the
 bundle its settings page.
 
-Disabling the host-plane row is required. Without it `compaction-basic` stays
-`auto: true` and registers its own pressure / overflow listeners on the root
-context. Those listeners compact the same session a second time using the stock
-unbounded replay span, so a summary request can still carry the whole history and
-be rejected as too large. Preset rows are nested inside agent presets, which a
-profile patch cannot address; the gate below renames those to this engine instead,
-which preserves their `auto` setting and applies the bounded span. A patch
-replaces a row's whole config rather than merging keys, so other settings on the
-host-plane row fall back to their defaults — the same trade-off billion-context
-makes when it disables this row.
+The profile-level stock engine must be disabled so Span Compaction can own the `compaction` service. Setting `auto: false` only stops the stock engine's pressure and overflow listeners; it still registers the service. Profile patches cannot target engine rows nested in agent presets. The preset gate replaces those rows separately, preserving their `auto` settings.
 
 `@deepseek-ai/cordis`, `@deepseek-ai/dsh-compaction`,
 `@deepseek-ai/dsh-compaction-basic` and `@deepseek-ai/schemastery` are
@@ -209,3 +199,14 @@ Three limits are worth knowing:
   unknown window it needs twice `nudgeMinTokens`. It also waits `nudgeEverySteps`
   admitted steps and at least 2% growth since the previous reminder. Steps are
   counted across turns, so a turn boundary cannot suppress the next reminder.
+
+## Development and CI
+
+Use Node.js 24.22.3 to reproduce CI locally:
+
+```sh
+npm ci --ignore-scripts
+npm run check
+```
+
+The [CI workflow](.github/workflows/ci.yml) runs on pushes to `main`, pull requests, and manual dispatch. It checks the Host and client builds, type checks, and runs the tests. It then boots each published DSH version admitted by `engines.dsh` with a temporary profile and links the local plugin to verify activation and tool registration. After all checks pass, it attaches an npm tarball to the workflow run without publishing a package or release.

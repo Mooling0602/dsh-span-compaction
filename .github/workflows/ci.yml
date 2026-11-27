@@ -1,0 +1,116 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  NODE_VERSION: '24.22.3'
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    outputs:
+      dsh-versions: ${{ steps.dsh-versions.outputs.versions }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v7
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+      - name: Install locked dependencies
+        run: npm ci --ignore-scripts
+      - name: Build, type check, and test
+        run: npm run check
+      - name: Check tracked build outputs
+        run: git diff --exit-code -- dist dists
+      - name: Discover compatible DSH versions
+        id: dsh-versions
+        run: |
+          versions="$(node .github/scripts/discover-dsh-versions.ts)"
+          printf 'versions=%s\n' "$versions" >> "$GITHUB_OUTPUT"
+          printf 'DSH versions: %s\n' "$versions"
+
+  verify:
+    needs: test
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        dsh-version: ${{ fromJSON(needs.test.outputs.dsh-versions) }}
+    name: Verify DSH ${{ matrix.dsh-version }}
+    env:
+      DSH_TELEMETRY_DISABLED: '1'
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v7
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 12.9.0
+      - name: Install and build the plugin
+        run: |
+          npm ci --ignore-scripts
+          npm run build
+      - name: Install DSH runtime
+        env:
+          DSH_VERSION: ${{ matrix.dsh-version }}
+        run: |
+          dsh_runtime="$RUNNER_TEMP/dsh-runtime"
+          mkdir -p "$dsh_runtime"
+          printf '{"private":true}\n' > "$dsh_runtime/package.json"
+          pnpm --dir "$dsh_runtime" add --ignore-scripts "@deepseek-ai/dsh@$DSH_VERSION"
+          {
+            printf 'DSH_HOME=%s/dsh-home\n' "$RUNNER_TEMP"
+            printf 'DSH_RUNTIME=%s\n' "$dsh_runtime"
+            printf 'DSH_PROFILE_BOOT=%s/node_modules/@deepseek-ai/dsh/lib/profile-boot.js\n' "$dsh_runtime"
+          } >> "$GITHUB_ENV"
+      - name: Initialize isolated profile
+        run: node .github/scripts/dsh-link-smoke.ts prepare "$DSH_PROFILE_BOOT"
+      - name: Install the local linked plugin
+        run: pnpm --dir "$DSH_RUNTIME" exec dsh plugin --profile ci-smoke add --ignore-scripts "link:${GITHUB_WORKSPACE}"
+      - name: Boot DSH and verify plugin activation
+        run: node .github/scripts/dsh-link-smoke.ts verify "$DSH_PROFILE_BOOT" "$GITHUB_WORKSPACE"
+
+  build:
+    needs: verify
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v7
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+      - name: Install and build the plugin
+        run: |
+          npm ci --ignore-scripts
+          npm run build
+      - name: Pack plugin
+        run: npm pack --ignore-scripts --pack-destination "$RUNNER_TEMP"
+      - name: Upload test package
+        uses: actions/upload-artifact@v7
+        with:
+          name: dsh-span-compaction
+          path: ${{ runner.temp }}/dsh-span-compaction-*.tgz
+          if-no-files-found: error
+          retention-days: 7
